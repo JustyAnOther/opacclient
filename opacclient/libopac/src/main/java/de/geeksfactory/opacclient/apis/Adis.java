@@ -79,6 +79,8 @@ public class Adis extends ApacheBaseApi implements OpacApi {
         types.put("Konsolenspiel", MediaType.GAME_CONSOLE);
         types.put("Spielkonsole", MediaType.GAME_CONSOLE);
         types.put("CD", MediaType.CD);
+        types.put("MP3-CD", MediaType.CD);
+        types.put("MP3", MediaType.CD);
         types.put("Zeitschrift", MediaType.MAGAZINE);
         types.put("Zeitschriftenheft", MediaType.MAGAZINE);
         types.put("Zeitung", MediaType.NEWSPAPER);

@@ -41,6 +41,14 @@ public class AdisParseItemTest {
     }
 
     @Test
+    public void testParseMp3Cd() {
+        testParseItem("Die Geschichte der getrennten Wege [MP3-CD] : Erwachsenenjahre / Elena Ferrante#5.2 Ferra#15332436"
+                ,"Die Geschichte der getrennten Wege"
+                , "Elena Ferrante"
+                , SearchResult.MediaType.CD);
+    }
+
+    @Test
     public void testParseBook() {
         testParseItem(" Blitzlichtgewitter : Roman / Christian Linker#5.2 Link#15167448"
                 , "Blitzlichtgewitter"
