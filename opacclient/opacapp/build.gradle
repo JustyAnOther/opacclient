@@ -66,6 +66,10 @@ android {
     }
 }
 
+repositories {
+    mavenCentral()  // wg. droidparts
+}
+
 dependencies {
     implementation(project(':libopac')) {
         transitive = false
@@ -96,6 +100,7 @@ dependencies {
     implementation 'com.github.bumptech.glide:okhttp3-integration:1.5.0@aar'
     implementation 'com.evernote:android-job:1.2.0'
     implementation 'net.sourceforge.streamsupport:streamsupport-cfuture:1.6.0'
+    implementation 'org.droidparts:droidparts-misc:3.2.5'
     debugImplementation 'com.facebook.stetho:stetho:1.5.0'
     debugImplementation 'com.facebook.stetho:stetho-okhttp3:1.5.0'
     debugImplementation 'com.squareup.leakcanary:leakcanary-android:1.4-beta2'
