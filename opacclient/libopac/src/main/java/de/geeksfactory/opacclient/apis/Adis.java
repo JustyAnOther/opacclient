@@ -1479,8 +1479,7 @@ public class Adis extends ApacheBaseApi implements OpacApi {
                 String text = tr.child(colmap.get("title")).html();
                 text = Jsoup.parse(text.replaceAll("(?i)<br[^>]*>", ";")).text();
                 if (split_title_author) {
-                    String[] split = text.split("[:/;\n]");
-                    parseItemText(split, split_title_author, item);
+                    parseItemText(text, "[:/;\n]", split_title_author, item);
                 } else {
                     item.setTitle(text);
                 }
@@ -1542,11 +1541,8 @@ public class Adis extends ApacheBaseApi implements OpacApi {
                                .text();
             if (text.contains(" / ")) {
                 // Format "Titel / Autor #Sig#Nr", z.B. normale Ausleihe in Berlin
-                String[] split = text.split("[/#\n]");
-                parseItemText(split, split_title_author, item);
-                String id = split[split.length - 1];
-                item.setId(id);
-            } else {
+                parseItemText(text, "[/#\n]", split_title_author, item);
+            } else if (text.contains(":")) {
                 // Format "Autor: Titel - Verlag - ISBN:... #Nummer", z.B. Fernleihe in Berlin
                 String[] split = text.split("#");
                 String[] aut_tit = split[0].split(": ");
@@ -1558,6 +1554,11 @@ public class Adis extends ApacheBaseApi implements OpacApi {
                 //Is always the last one...
                 String id = split[split.length - 1];
                 item.setId(id);
+            } else {
+                // Format "Titel #Sig#Nr", z.B. normale Ausleihe Stuttgart aber ohne Author
+                parseItemText(text, "[/#\n]", split_title_author, item);
+                // Author fehlt in diesem Fall
+                item.setAuthor(null );
             }
             String date = tr.child(1).text().trim();
             if (date.contains("-")) {
@@ -1593,16 +1594,17 @@ public class Adis extends ApacheBaseApi implements OpacApi {
     /**
      * Sets Title, Autor and MediaType in Item
      *
-     * @param split              Stringarray with raw-Title at index 0 und Autor (optinal) as index
-     *                           1
+     * @param text               Textzeile mit Titel, Author etc und Id
+     * @param seps               separetors
      * @param split_title_author switch whether to split title and author
      * @param item               Reserved- or LentItem in dem Title und Mediatype abgelegt werden
      *                           sollen
      */
-    static void parseItemText(final String[] split, boolean split_title_author, AccountItem item) {
+    static void parseItemText(String text, String seps, boolean split_title_author, AccountItem item) {
         final char HAKEN = (char) 172;
         final char SPACE = (char) 32; // " ".charAt(0);
 
+        final String[] split = text.split(seps);
         String title = split[0];
         if (split_title_author) {
             title = title.replaceFirst("([^:;\n]+)[:;\n](.*)$", "$1");
@@ -1686,6 +1688,10 @@ public class Adis extends ApacheBaseApi implements OpacApi {
             item.setAuthor(
                     split[1].replaceFirst("([^:;\n]+)[:;\n](.*)$", "$1").trim());
         }
+
+        // id is always the last one...
+        String id = split[split.length - 1];
+        item.setId(id);
     }
 
     protected Document handleLoginForm(Document doc, Account account)
