@@ -39,6 +39,7 @@ import de.geeksfactory.opacclient.networking.NotReachableException;
 import de.geeksfactory.opacclient.networking.SSLSecurityException;
 import de.geeksfactory.opacclient.objects.Account;
 import de.geeksfactory.opacclient.objects.AccountData;
+import de.geeksfactory.opacclient.objects.AccountItem;
 import de.geeksfactory.opacclient.objects.Copy;
 import de.geeksfactory.opacclient.objects.Detail;
 import de.geeksfactory.opacclient.objects.DetailedItem;
@@ -73,6 +74,8 @@ public class Adis extends ApacheBaseApi implements OpacApi {
         types.put("Konsolenspiel", MediaType.GAME_CONSOLE);
         types.put("Spielkonsole", MediaType.GAME_CONSOLE);
         types.put("CD", MediaType.CD);
+        types.put("MP3-CD", MediaType.CD);
+        types.put("MP3", MediaType.CD);
         types.put("Zeitschrift", MediaType.MAGAZINE);
         types.put("Zeitschriftenheft", MediaType.MAGAZINE);
         types.put("Zeitung", MediaType.NEWSPAPER);
@@ -1477,11 +1480,7 @@ public class Adis extends ApacheBaseApi implements OpacApi {
                 text = Jsoup.parse(text.replaceAll("(?i)<br[^>]*>", ";")).text();
                 if (split_title_author) {
                     String[] split = text.split("[:/;\n]");
-                    item.setTitle(split[0].replaceFirst("([^:;\n]+)[:;\n](.*)$", "$1").trim());
-                    if (split.length > 1) {
-                        item.setAuthor(
-                                split[1].replaceFirst("([^:;\n]+)[:;\n](.*)$", "$1").trim());
-                    }
+                    parseItemText(split, split_title_author, item);
                 } else {
                     item.setTitle(text);
                 }
@@ -1544,17 +1543,9 @@ public class Adis extends ApacheBaseApi implements OpacApi {
             if (text.contains(" / ")) {
                 // Format "Titel / Autor #Sig#Nr", z.B. normale Ausleihe in Berlin
                 String[] split = text.split("[/#\n]");
-                String title = split[0];
-                //Is always the last one...
+                parseItemText(split, split_title_author, item);
                 String id = split[split.length - 1];
                 item.setId(id);
-                if (split_title_author) {
-                    title = title.replaceFirst("([^:;\n]+)[:;\n](.*)$", "$1");
-                }
-                item.setTitle(title.trim());
-                if (split.length > 1) {
-                    item.setAuthor(split[1].replaceFirst("([^:;\n]+)[:;\n](.*)$", "$1").trim());
-                }
             } else {
                 // Format "Autor: Titel - Verlag - ISBN:... #Nummer", z.B. Fernleihe in Berlin
                 String[] split = text.split("#");
@@ -1596,6 +1587,104 @@ public class Adis extends ApacheBaseApi implements OpacApi {
             }
 
             lent.add(item);
+        }
+    }
+
+    /**
+     * Sets Title, Autor and MediaType in Item
+     *
+     * @param split              Stringarray with raw-Title at index 0 und Autor (optinal) as index
+     *                           1
+     * @param split_title_author switch whether to split title and author
+     * @param item               Reserved- or LentItem in dem Title und Mediatype abgelegt werden
+     *                           sollen
+     */
+    static void parseItemText(final String[] split, boolean split_title_author, AccountItem item) {
+        final char HAKEN = (char) 172;
+        final char SPACE = (char) 32; // " ".charAt(0);
+
+        String title = split[0];
+        if (split_title_author) {
+            title = title.replaceFirst("([^:;\n]+)[:;\n](.*)$", "$1");
+        }
+
+        // merkwürdiger Haken zwischen Wörtern in StB-Stuttgart durch Space ersetzen
+        // mehrfache Leerzeichen durch ein Space ersetzen
+        // Space am Anfang und Ende entfernen
+        // title = title.replace(HAKEN, SPACE);
+        char[] t2ca = new char[title.length()];
+        boolean lastCharWasSpace = true;
+        int j = 0;
+        for (int i = 0; i < title.length(); i++) {
+            char nextChar = title.charAt(i);
+            if (nextChar == HAKEN) {
+                nextChar = SPACE;
+            }
+            if (lastCharWasSpace && (nextChar == SPACE)) {
+            } else {
+                t2ca[j] = nextChar;
+                j++;
+                lastCharWasSpace = (nextChar == SPACE);
+            }
+        }
+        if (lastCharWasSpace) {
+            j--;
+        }
+        title = new String(t2ca, 0, j);
+
+        // Leading/Trailing Spaces entfernen
+        // title = title.trim();
+
+        // Prefix MediaType "[...] ..." entfernen, z.B. "[DVD-Video] ..." am Anfang
+        if (title.startsWith("[")) {
+            int ei = title.indexOf("]");
+            if (ei > 0) {
+                String type = title.substring(1, ei);
+                if (types.containsKey(type)) {
+                    item.setMediaType(types.get(type));
+                    do {
+                        ei++;
+                    } while (title.charAt(ei) == SPACE);
+                    title = title.substring(ei);
+                } else {
+                    item.setMediaType(MediaType.UNKNOWN);
+                }
+            }
+        } else {
+            // Default MediaType is BOOK
+            item.setMediaType(MediaType.BOOK);
+        }
+
+        // Postfix MediaType "... [...]" entfernen, z. B. "... [CD]" am Ende
+        if (title.endsWith("]")) {
+            int ei = title.lastIndexOf("[");
+            if (ei > 0) {
+                String type = title.substring(ei + 1, title.length() - 1);
+                if (types.containsKey(type)) {
+                    item.setMediaType(types.get(type));
+                    do {
+                        ei--;
+                    } while (title.charAt(ei) == SPACE);
+                    title = title.substring(0, ei + 1);
+                } else {
+                    if (item.getMediaType() == null) {
+                        item.setMediaType(MediaType.UNKNOWN);
+                    }
+                }
+                // title = title.trim();
+            }
+        }
+        if (item.getMediaType() == null) {
+            // default
+            item.setMediaType(MediaType.BOOK);
+        }
+
+        item.setTitle(title);
+
+        // Autor
+        if (split.length > 1) {
+            item.setAuthor(
+                    split[1].replaceFirst("([^:;\n]+)[:;\n](.*)$", "$1").trim());
         }
     }
 
