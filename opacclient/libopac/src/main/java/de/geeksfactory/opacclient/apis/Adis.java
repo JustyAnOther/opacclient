@@ -1753,7 +1753,11 @@ public class Adis extends ApacheBaseApi implements OpacApi {
 
         Document doc = htmlGet(opac_url + ";jsessionid=" + s_sid + "?service="
                 + s_service + getSpParams());
+        return parseSearchFields(doc);
+    }
 
+    static List<SearchField> parseSearchFields(Document doc) throws IOException,
+             JSONException {
         List<SearchField> fields = new ArrayList<>();
         // dropdown to select which field you want to search in
         Elements searchoptions = doc.select("#SUCH01_1 option");
