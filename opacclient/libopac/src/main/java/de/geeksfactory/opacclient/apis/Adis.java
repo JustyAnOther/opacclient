@@ -39,6 +39,7 @@ import de.geeksfactory.opacclient.networking.NotReachableException;
 import de.geeksfactory.opacclient.networking.SSLSecurityException;
 import de.geeksfactory.opacclient.objects.Account;
 import de.geeksfactory.opacclient.objects.AccountData;
+import de.geeksfactory.opacclient.objects.AccountItem;
 import de.geeksfactory.opacclient.objects.Copy;
 import de.geeksfactory.opacclient.objects.Detail;
 import de.geeksfactory.opacclient.objects.DetailedItem;
@@ -73,6 +74,8 @@ public class Adis extends ApacheBaseApi implements OpacApi {
         types.put("Konsolenspiel", MediaType.GAME_CONSOLE);
         types.put("Spielkonsole", MediaType.GAME_CONSOLE);
         types.put("CD", MediaType.CD);
+        types.put("MP3-CD", MediaType.CD);
+        types.put("MP3", MediaType.CD);
         types.put("Zeitschrift", MediaType.MAGAZINE);
         types.put("Zeitschriftenheft", MediaType.MAGAZINE);
         types.put("Zeitung", MediaType.NEWSPAPER);
@@ -1476,12 +1479,7 @@ public class Adis extends ApacheBaseApi implements OpacApi {
                 String text = tr.child(colmap.get("title")).html();
                 text = Jsoup.parse(text.replaceAll("(?i)<br[^>]*>", ";")).text();
                 if (split_title_author) {
-                    String[] split = text.split("[:/;\n]");
-                    item.setTitle(split[0].replaceFirst("([^:;\n]+)[:;\n](.*)$", "$1").trim());
-                    if (split.length > 1) {
-                        item.setAuthor(
-                                split[1].replaceFirst("([^:;\n]+)[:;\n](.*)$", "$1").trim());
-                    }
+                    parseItemText(text, "[:/;\n]", split_title_author, item);
                 } else {
                     item.setTitle(text);
                 }
@@ -1543,19 +1541,8 @@ public class Adis extends ApacheBaseApi implements OpacApi {
                                .text();
             if (text.contains(" / ")) {
                 // Format "Titel / Autor #Sig#Nr", z.B. normale Ausleihe in Berlin
-                String[] split = text.split("[/#\n]");
-                String title = split[0];
-                //Is always the last one...
-                String id = split[split.length - 1];
-                item.setId(id);
-                if (split_title_author) {
-                    title = title.replaceFirst("([^:;\n]+)[:;\n](.*)$", "$1");
-                }
-                item.setTitle(title.trim());
-                if (split.length > 1) {
-                    item.setAuthor(split[1].replaceFirst("([^:;\n]+)[:;\n](.*)$", "$1").trim());
-                }
-            } else {
+                parseItemText(text, "[/#\n]", split_title_author, item);
+            } else if (text.contains(":")) {
                 // Format "Autor: Titel - Verlag - ISBN:... #Nummer", z.B. Fernleihe in Berlin
                 String[] split = text.split("#");
                 String[] aut_tit = split[0].split(": ");
@@ -1567,6 +1554,11 @@ public class Adis extends ApacheBaseApi implements OpacApi {
                 //Is always the last one...
                 String id = split[split.length - 1];
                 item.setId(id);
+            } else {
+                // Format "Titel #Sig#Nr", z.B. normale Ausleihe Stuttgart aber ohne Author
+                parseItemText(text, "[/#\n]", split_title_author, item);
+                // Author fehlt in diesem Fall
+                item.setAuthor(null );
             }
             String date = tr.child(1).text().trim();
             if (date.contains("-")) {
@@ -1597,6 +1589,109 @@ public class Adis extends ApacheBaseApi implements OpacApi {
 
             lent.add(item);
         }
+    }
+
+    /**
+     * Sets Title, Autor and MediaType in Item
+     *
+     * @param text               Textzeile mit Titel, Author etc und Id
+     * @param seps               separetors
+     * @param split_title_author switch whether to split title and author
+     * @param item               Reserved- or LentItem in dem Title und Mediatype abgelegt werden
+     *                           sollen
+     */
+    static void parseItemText(String text, String seps, boolean split_title_author, AccountItem item) {
+        final char HAKEN = (char) 172;
+        final char SPACE = (char) 32; // " ".charAt(0);
+
+        final String[] split = text.split(seps);
+        String title = split[0];
+        if (split_title_author) {
+            title = title.replaceFirst("([^:;\n]+)[:;\n](.*)$", "$1");
+        }
+
+        // merkwürdiger Haken zwischen Wörtern in StB-Stuttgart durch Space ersetzen
+        // mehrfache Leerzeichen durch ein Space ersetzen
+        // Space am Anfang und Ende entfernen
+        // title = title.replace(HAKEN, SPACE);
+        char[] t2ca = new char[title.length()];
+        boolean lastCharWasSpace = true;
+        int j = 0;
+        for (int i = 0; i < title.length(); i++) {
+            char nextChar = title.charAt(i);
+            if (nextChar == HAKEN) {
+                nextChar = SPACE;
+            }
+            if (lastCharWasSpace && (nextChar == SPACE)) {
+            } else {
+                t2ca[j] = nextChar;
+                j++;
+                lastCharWasSpace = (nextChar == SPACE);
+            }
+        }
+        if (lastCharWasSpace) {
+            j--;
+        }
+        title = new String(t2ca, 0, j);
+
+        // Leading/Trailing Spaces entfernen
+        // title = title.trim();
+
+        // Prefix MediaType "[...] ..." entfernen, z.B. "[DVD-Video] ..." am Anfang
+        if (title.startsWith("[")) {
+            int ei = title.indexOf("]");
+            if (ei > 0) {
+                String type = title.substring(1, ei);
+                if (types.containsKey(type)) {
+                    item.setMediaType(types.get(type));
+                    do {
+                        ei++;
+                    } while (title.charAt(ei) == SPACE);
+                    title = title.substring(ei);
+                } else {
+                    item.setMediaType(MediaType.UNKNOWN);
+                }
+            }
+        } else {
+            // Default MediaType is BOOK
+            item.setMediaType(MediaType.BOOK);
+        }
+
+        // Postfix MediaType "... [...]" entfernen, z. B. "... [CD]" am Ende
+        if (title.endsWith("]")) {
+            int ei = title.lastIndexOf("[");
+            if (ei > 0) {
+                String type = title.substring(ei + 1, title.length() - 1);
+                if (types.containsKey(type)) {
+                    item.setMediaType(types.get(type));
+                    do {
+                        ei--;
+                    } while (title.charAt(ei) == SPACE);
+                    title = title.substring(0, ei + 1);
+                } else {
+                    if (item.getMediaType() == null) {
+                        item.setMediaType(MediaType.UNKNOWN);
+                    }
+                }
+                // title = title.trim();
+            }
+        }
+        if (item.getMediaType() == null) {
+            // default
+            item.setMediaType(MediaType.BOOK);
+        }
+
+        item.setTitle(title);
+
+        // Autor
+        if (split.length > 1) {
+            item.setAuthor(
+                    split[1].replaceFirst("([^:;\n]+)[:;\n](.*)$", "$1").trim());
+        }
+
+        // id is always the last one...
+        String id = split[split.length - 1];
+        item.setId(id);
     }
 
     protected Document handleLoginForm(Document doc, Account account)
@@ -1658,7 +1753,11 @@ public class Adis extends ApacheBaseApi implements OpacApi {
 
         Document doc = htmlGet(opac_url + ";jsessionid=" + s_sid + "?service="
                 + s_service + getSpParams());
+        return parseSearchFields(doc);
+    }
 
+    static List<SearchField> parseSearchFields(Document doc) throws IOException,
+             JSONException {
         List<SearchField> fields = new ArrayList<>();
         // dropdown to select which field you want to search in
         Elements searchoptions = doc.select("#SUCH01_1 option");
