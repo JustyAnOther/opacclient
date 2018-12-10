@@ -1046,7 +1046,7 @@ public class Open extends OkHttpBaseApi implements OpacApi {
      *                   null
      * @return A MultipartEntityBuilder containing the data of the form
      */
-    protected MultipartBody.Builder formData(FormElement form, String submitName) {
+    protected static MultipartBody.Builder formData(FormElement form, String submitName) {
         MultipartBody.Builder data = new MultipartBody.Builder();
         data.setType(MediaType.parse("multipart/form-data; charset=utf-8"));
 
@@ -1054,6 +1054,10 @@ public class Open extends OkHttpBaseApi implements OpacApi {
         // data.addTextBody breaks utf-8 characters in select boxes in Bern
         // .getBytes is an implicit, undeclared UTF-8 conversion, this seems to work -- at least
         // in Bern
+
+        // Remove nested forms
+        form.select("form form").remove();
+        form = ((FormElement) Jsoup.parse(form.outerHtml()).select("form").get(0));
 
         // iterate the form control elements and accumulate their values
         for (Element el : form.elements()) {
