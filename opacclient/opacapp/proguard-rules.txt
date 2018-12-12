@@ -15,6 +15,7 @@
 -keep interface android.support.design.widget.** { *; }
 -dontwarn android.support.design.**
 -dontwarn android.support.v4.**
+-dontwarn org.apache.http.entity.mime.**
 
 # JavaMeaningDetector uses these Java 7 classes for accessing files which are not included in
 # Android, so we need to ignore warnings related to them
