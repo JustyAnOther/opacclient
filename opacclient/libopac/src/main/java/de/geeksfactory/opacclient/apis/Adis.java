@@ -28,6 +28,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -57,6 +59,8 @@ import de.geeksfactory.opacclient.searchfields.SearchQuery;
 import de.geeksfactory.opacclient.searchfields.TextSearchField;
 
 public class Adis extends ApacheBaseApi implements OpacApi {
+
+    private static final Logger LOGGER = Logger.getLogger(Adis.class.getName());
 
     protected static final String DATA_DISABLE_WHEN_SELECTED = "disableWhenSelected";
     protected static final String DATA_GROUP = "group";
@@ -202,6 +206,23 @@ public class Adis extends ApacheBaseApi implements OpacApi {
             data.add(new BasicNameValuePair("requestCount", s_requestCount + ""));
         }
 
+        if (LOGGER.isLoggable(Level.INFO)) {
+            StringBuffer sb = new StringBuffer();
+            for (NameValuePair nv : data) {
+                if (nv.getName().startsWith("$Toolbar")) {
+                    sb.append(nv.getName());
+                    sb.append("=");
+                    sb.append(nv.getValue());
+                    sb.append(",");
+                }
+            }
+            if(sb.length()>0) {
+                sb.setLength(sb.length()-1);
+                logInfo("%s - %s", "htmlPost", sb.toString());
+            } else {
+                logInfo("%s - %s", "htmlPost", "no $Toolbar...");
+            }
+        }
         httppost.setEntity(new UrlEncodedFormEntity(data, getDefaultEncoding()));
         HttpResponse response;
 
@@ -239,6 +260,14 @@ public class Adis extends ApacheBaseApi implements OpacApi {
                 getDefaultEncoding());
         HttpUtils.consume(response.getEntity());
         Document doc = Jsoup.parse(html);
+
+        if (LOGGER.isLoggable(Level.INFO)) {
+            Elements h1s = doc.select("h1");
+            if (h1s.size() > 0) {
+                logInfo("%s - h1: %s", "htmlPost", h1s.first().text());
+            }
+        }
+
         Pattern patRequestCount = Pattern
                 .compile(".*requestCount=([0-9]+)[^0-9].*");
         for (Element a : doc.select("a")) {
@@ -663,8 +692,8 @@ public class Adis extends ApacheBaseApi implements OpacApi {
         // Reset
         updatePageform(doc);
         nvpairs = s_pageform;
-        nvpairs.add(new BasicNameValuePair("$Toolbar_1.x", "1"));
-        nvpairs.add(new BasicNameValuePair("$Toolbar_1.y", "1"));
+        nvpairs.add(new BasicNameValuePair("$Toolbar_0.x", "1"));
+        nvpairs.add(new BasicNameValuePair("$Toolbar_0.y", "1"));
         parse_search_wrapped(htmlPost(opac_url + ";jsessionid=" + s_sid, nvpairs), 1);
         nvpairs = s_pageform;
         nvpairs.add(new BasicNameValuePair("$Toolbar_3.x", "1"));
@@ -1922,6 +1951,14 @@ public class Adis extends ApacheBaseApi implements OpacApi {
     public Set<String> getSupportedLanguages() throws IOException {
         // TODO Auto-generated method stub
         return null;
+    }
+
+    private static void logInfo(String format, Object... args) {
+        if (!LOGGER.isLoggable(Level.INFO)) {
+            return;
+        }
+        String msg = String.format(format, args);
+        LOGGER.log(Level.INFO, msg);
     }
 
 }
