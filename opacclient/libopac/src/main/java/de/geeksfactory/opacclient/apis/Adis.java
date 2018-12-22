@@ -735,6 +735,8 @@ public class Adis extends ApacheBaseApi implements OpacApi {
             if (value.contains("hier klicken") || value.startsWith("zur ") ||
                     title.contains("URL")) {
                 res.addDetail(new Detail(title, tr.child(1).select("a").first().absUrl("href")));
+            } else if("Zitierlink".equals(value)) {
+                // nicht in Detail übernhemen, unnützt
             } else {
                 res.addDetail(new Detail(title, value));
             }
