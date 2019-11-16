@@ -18,6 +18,7 @@ public class HistoryItem extends AccountItem implements Serializable {
     private boolean ebook;
     private String barcode;
 
+    private LocalDate deadline;
     private int prolongCount = 0;
 
     public void setProlongCount(int count) {
@@ -27,6 +28,12 @@ public class HistoryItem extends AccountItem implements Serializable {
     public int getProlongCount() {
         return prolongCount;
     }
+
+    public LocalDate getDeadline() { return deadline; }
+    public void setDeadline(LocalDate deadline) {
+        this.deadline = deadline;
+    }
+
     /**
      * @return Barcode/unique identifier of a lent item. Should be set.
      */
@@ -216,7 +223,9 @@ public class HistoryItem extends AccountItem implements Serializable {
                 ", barcode='" + barcode + '\'' +
                 ", homeBranch='" + homeBranch + '\'' +
                 ", lendingBranch='" + lendingBranch + '\'' +
-                ", ebook=" + ebook +
+                ", ebook=" + ebook + '\'' +
+                ", deadline=" + deadline + '\'' +
+                ", prolongCount=" + prolongCount +
                 '}';
     }
 }

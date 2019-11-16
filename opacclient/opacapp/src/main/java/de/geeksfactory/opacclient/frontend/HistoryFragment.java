@@ -27,26 +27,35 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.database.Cursor;
+import android.graphics.Typeface;
 import android.net.Uri;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
 import android.text.Html;
+import android.text.SpannableStringBuilder;
+import android.text.TextUtils;
+import android.text.style.ForegroundColorSpan;
+import android.text.style.StyleSpan;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.MenuInflater;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.view.ViewGroup;
+import android.view.ViewTreeObserver;
 import android.widget.AbsListView;
 import android.widget.AdapterView;
 import android.widget.AdapterView.OnItemClickListener;
 import android.widget.ImageView;
 import android.widget.ListView;
+import android.widget.RelativeLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import com.google.android.material.snackbar.Snackbar;
 
+import org.joda.time.format.DateTimeFormat;
+import org.joda.time.format.DateTimeFormatter;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -520,7 +529,7 @@ public class HistoryFragment extends Fragment implements
     private class ItemListAdapter extends SimpleCursorAdapter {
 
         public ItemListAdapter() {
-            super(getActivity(), R.layout.listitem_history, null,
+            super(getActivity(), R.layout.listitem_history_item, null,
                     new String[]{"bib"}, null, 0);
         }
 
@@ -528,12 +537,72 @@ public class HistoryFragment extends Fragment implements
         public void bindView(View view, Context context, Cursor cursor) {
             HistoryItem item = HistoryDataSource.cursorToItem(cursor);
 
-            TextView tv = (TextView) view.findViewById(R.id.tvTitle);
+            TextView tvTitleAndAuthor = (TextView) view.findViewById(R.id.tvTitleAndAuthor);
+
+            // von AccountAdapter:
+            // Overview (Title/Author, Status/Deadline, Branch)
+            SpannableStringBuilder builder = new SpannableStringBuilder();
             if (item.getTitle() != null) {
-                tv.setText(Html.fromHtml(item.getTitle()));
-            } else {
-                tv.setText("");
+                builder.append(item.getTitle());
+                builder.setSpan(new StyleSpan(Typeface.BOLD), 0, item.getTitle().length(), 0);
+                if (!TextUtils.isEmpty(item.getAuthor())) builder.append(". ");
             }
+            if (!TextUtils.isEmpty(item.getAuthor())) {
+                builder.append(item.getAuthor().split("¬\\[",2)[0]);
+            }
+            setTextOrHide(builder, tvTitleAndAuthor);
+            // statt von StarFragment
+            /*
+            if (item.getTitle() != null) {
+                tvTitleAndAuthor.setText(Html.fromHtml(item.getTitle()));
+            } else {
+                tvTitleAndAuthor.setText("");
+            }
+            */
+
+            TextView tvStatus = (TextView) view.findViewById(R.id.tvStatus);
+            TextView tvBranch = (TextView) view.findViewById(R.id.tvBranch);
+
+            DateTimeFormatter fmt = DateTimeFormat.shortDate();
+
+            builder = new SpannableStringBuilder();
+            if (item.getFirstDate() != null) {
+                int start = builder.length();
+                builder.append(fmt.print(item.getFirstDate()));
+                // setSpan with a span argument is not supported before API 21
+                /*
+                builder.setSpan(new ForegroundColorSpan(textColorPrimary),
+                        start, start + fmt.print(item.getDeadline()).length(), 0);
+                 */
+                if (item.getLastDate() != null) {
+                    builder.append(" – ");
+                    builder.append(fmt.print(item.getLastDate()));
+                }
+            }
+            setTextOrHide(builder, tvStatus);
+
+            if (item.getHomeBranch() != null) {
+                setTextOrHide(Html.fromHtml(item.getHomeBranch()), tvBranch);
+            }
+
+            tvBranch.getViewTreeObserver().addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener() {
+                @Override
+                public boolean onPreDraw () {
+                    tvBranch.getViewTreeObserver().removeOnPreDrawListener(this);
+                    // place tvBranch next to or below tvStatus to prevent overlapping
+                    RelativeLayout.LayoutParams lp = (RelativeLayout.LayoutParams)tvBranch.getLayoutParams();
+                    if (tvStatus.getPaint().measureText(tvStatus.getText().toString()) <
+                            tvStatus.getWidth() / 2 - 4){
+                        lp.addRule(RelativeLayout.BELOW, 0);  //removeRule only since API 17
+                        lp.addRule(RelativeLayout.ALIGN_PARENT_TOP);
+                    } else {
+                        lp.addRule(RelativeLayout.ALIGN_PARENT_TOP,0);
+                        lp.addRule(RelativeLayout.BELOW, R.id.tvStatus);
+                    }
+                    tvBranch.setLayoutParams(lp);
+                    return true;
+                }
+            });
 
             ImageView ivType = (ImageView) view.findViewById(R.id.ivMediaType);
             if (item.getMediaType() != null) {
@@ -554,6 +623,15 @@ public class HistoryFragment extends Fragment implements
                     callback.removeFragment();
                 }
             });
+        }
+    }
+
+    protected static void setTextOrHide(CharSequence value, TextView tv) {
+        if (!TextUtils.isEmpty(value)) {
+            tv.setVisibility(View.VISIBLE);
+            tv.setText(value);
+        } else {
+            tv.setVisibility(View.GONE);
         }
     }
 
