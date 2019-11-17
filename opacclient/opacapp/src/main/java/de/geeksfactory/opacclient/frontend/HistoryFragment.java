@@ -34,7 +34,6 @@ import android.preference.PreferenceManager;
 import android.text.Html;
 import android.text.SpannableStringBuilder;
 import android.text.TextUtils;
-import android.text.style.ForegroundColorSpan;
 import android.text.style.StyleSpan;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -79,14 +78,13 @@ import de.geeksfactory.opacclient.OpacClient;
 import de.geeksfactory.opacclient.R;
 import de.geeksfactory.opacclient.frontend.OpacActivity.AccountSelectedListener;
 import de.geeksfactory.opacclient.objects.Account;
-import de.geeksfactory.opacclient.objects.SearchResult;
 import de.geeksfactory.opacclient.objects.HistoryItem;
 import de.geeksfactory.opacclient.searchfields.SearchField;
 import de.geeksfactory.opacclient.searchfields.SearchField.Meaning;
 import de.geeksfactory.opacclient.searchfields.SearchQuery;
-import de.geeksfactory.opacclient.storage.JsonSearchFieldDataSource;
-import de.geeksfactory.opacclient.storage.HistoryDatabase;
 import de.geeksfactory.opacclient.storage.HistoryDataSource;
+import de.geeksfactory.opacclient.storage.HistoryDatabase;
+import de.geeksfactory.opacclient.storage.JsonSearchFieldDataSource;
 import de.geeksfactory.opacclient.utils.CompatibilityUtils;
 
 public class HistoryFragment extends Fragment implements
@@ -109,6 +107,8 @@ public class HistoryFragment extends Fragment implements
     private int activatedPosition = ListView.INVALID_POSITION;
     private TextView tvWelcome;
     private HistoryItem historyItem;
+
+    private String sortOrder = null;
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
@@ -206,8 +206,46 @@ public class HistoryFragment extends Fragment implements
         } else if (item.getItemId() == R.id.action_import_from_storage) {
             importFromStorage();
             return true;
+        } else if (item.getItemId() == R.id.action_sort_author) {
+            sort("author");
+            return true;
+        } else if (item.getItemId() == R.id.action_sort_firstDate) {
+            sort("firstDate");
+            return true;
+        } else if (item.getItemId() == R.id.action_sort_lastDate) {
+            sort("lastDate");
+            return true;
+        } else if (item.getItemId() == R.id.action_sort_prolongCount) {
+            sort("prolongCount");
+            return true;
+        } else if (item.getItemId() == R.id.action_sort_duration) {
+            sort("julianday(lastDate) - julianday(firstDate)");
+            return true;
         }
         return super.onOptionsItemSelected(item);
+    }
+
+    private void sort(String orderby) {
+
+        if (sortOrder == null) {
+            // bisher nicht sortiert
+            sortOrder = orderby + " ASC";
+        } else if (sortOrder.startsWith(orderby)) {
+            // bereits nach dieser Spalte sortiert
+            // d.h. ASC/DESC swappen
+            if (sortOrder.equals(orderby + " ASC")) {
+                sortOrder = orderby + " DESC";
+            } else {
+                sortOrder = orderby + " ASC";
+            }
+        } else {
+            // bisher nach anderer Spalte sortiert
+            // zunächst ASC
+            sortOrder = orderby + " ASC";
+        }
+
+        // Loader restarten
+        getActivity().getSupportLoaderManager().restartLoader(0, null, this);
     }
 
     @Override
@@ -244,7 +282,7 @@ public class HistoryFragment extends Fragment implements
             return new CursorLoader(getActivity(),
                     app.getHistoryProviderHistoryUri(), HistoryDatabase.COLUMNS,
                     HistoryDatabase.HIST_WHERE_LIB, new String[]{app
-                    .getLibrary().getIdent()}, null);
+                    .getLibrary().getIdent()}, sortOrder);
         } else {
             return null;
         }
