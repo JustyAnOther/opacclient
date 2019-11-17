@@ -31,13 +31,6 @@ import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Handler;
 import android.preference.PreferenceManager;
-import android.support.v4.app.ActivityCompat;
-import android.support.v4.app.ActivityOptionsCompat;
-import android.support.v4.app.Fragment;
-import android.support.v4.widget.SwipeRefreshLayout;
-import android.support.v7.app.AlertDialog;
-import android.support.v7.widget.LinearLayoutManager;
-import android.support.v7.widget.RecyclerView;
 import android.text.Html;
 import android.text.method.LinkMovementMethod;
 import android.view.LayoutInflater;
@@ -71,6 +64,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import androidx.appcompat.app.AlertDialog;
+import androidx.core.app.ActivityCompat;
+import androidx.core.app.ActivityOptionsCompat;
+import androidx.fragment.app.Fragment;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 import de.geeksfactory.opacclient.OpacClient;
 import de.geeksfactory.opacclient.R;
 import de.geeksfactory.opacclient.apis.EbookServiceApi;
@@ -104,6 +104,7 @@ import de.geeksfactory.opacclient.objects.ReservedItem;
 import de.geeksfactory.opacclient.reminder.ReminderHelper;
 import de.geeksfactory.opacclient.reminder.SyncAccountJobCreator;
 import de.geeksfactory.opacclient.storage.AccountDataSource;
+import de.geeksfactory.opacclient.storage.PreferenceDataSource;
 import de.geeksfactory.opacclient.ui.AccountDividerItemDecoration;
 import de.geeksfactory.opacclient.utils.ErrorReporter;
 import su.j2e.rvjoiner.JoinableAdapter;
@@ -340,6 +341,11 @@ public class AccountFragment extends Fragment implements
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         if (item.getItemId() == R.id.action_refresh) {
+            PreferenceDataSource prefs = new PreferenceDataSource(getActivity());
+            if (prefs.getAccountPtrHintShown() < 2) {
+                Toast.makeText(getActivity(), R.string.account_ptr_hint, Toast.LENGTH_LONG).show();
+                prefs.setAccountPtrHintShown(prefs.getAccountPtrHintShown() + 1);
+            }
             refresh();
         } else if (item.getItemId() == R.id.action_prolong_all) {
             prolongAllStart();
@@ -865,7 +871,7 @@ public class AccountFragment extends Fragment implements
                                                public void onClick(
                                                        DialogInterface dialog, int id) {
                                                    dialog.cancel();
-                                                   String reader = "com.bluefirereader";
+                                                   String reader = "com.aldiko.android";
                                                    if (a.toLowerCase().contains("overdrive")) {
                                                        reader = "com.overdrive.mobile.android.mediaconsole";
                                                    }

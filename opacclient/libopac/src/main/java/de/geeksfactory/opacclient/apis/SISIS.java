@@ -154,6 +154,35 @@ public class SISIS extends OkHttpBaseApi implements OpacApi {
         defaulttypes.put("Web-Link", MediaType.URL);
         defaulttypes.put("ejournal", MediaType.EDOC);
         defaulttypes.put("karte", MediaType.MAP);
+        defaulttypes.put("Blu-ray Disc", MediaType.BLURAY );
+        defaulttypes.put("Blu-ray Disc 3D", MediaType.BLURAY ); // TODO: define more specific media type
+        defaulttypes.put("CD-ROM", MediaType.CD_SOFTWARE );
+        defaulttypes.put("DVD-ROM", MediaType.DVD ); // TODO: define more specific media type
+        defaulttypes.put("eAudio", MediaType.EAUDIO );
+        defaulttypes.put("eMusic", MediaType.EAUDIO );
+        defaulttypes.put("ePaper", MediaType.EDOC );
+        defaulttypes.put("eText", MediaType.EDOC );
+        defaulttypes.put("eVideo", MediaType.EVIDEO );
+        defaulttypes.put("Ausleihgerät", MediaType.DEVICE );
+        defaulttypes.put("Kinderbuch", MediaType.BOOK );
+        defaulttypes.put("Schallplatte", MediaType.LP_RECORD );
+        defaulttypes.put("Medienkombination", MediaType.PACKAGE );
+        defaulttypes.put("MP3-CD", MediaType.MP3 );
+        defaulttypes.put("Spiel für Nintendo DS", MediaType.GAME_CONSOLE_NINTENDO );
+        defaulttypes.put("Spiel für Nintendo 3DS", MediaType.GAME_CONSOLE_NINTENDO );
+        defaulttypes.put("Spiel für PlayStation 2", MediaType.GAME_CONSOLE_PLAYSTATION );
+        defaulttypes.put("Spiel für PlayStation 3", MediaType.GAME_CONSOLE_PLAYSTATION );
+        defaulttypes.put("Spiel für PlayStation 4", MediaType.GAME_CONSOLE_PLAYSTATION );
+        defaulttypes.put("Spiel", MediaType.BOARDGAME );
+        defaulttypes.put("Spiel für Nintendo Switch", MediaType.GAME_CONSOLE_NINTENDO );
+        defaulttypes.put("Spiel für Nintendo Wii", MediaType.GAME_CONSOLE_WII );
+        defaulttypes.put("Spiel für Nintendo Wii U", MediaType.GAME_CONSOLE_WII );
+        defaulttypes.put("Spiel für Xbox 360", MediaType.GAME_CONSOLE_XBOX );
+        defaulttypes.put("Spiel für Xbox One", MediaType.GAME_CONSOLE_XBOX );
+        defaulttypes.put("Zeitung / Zeitschrift", MediaType.NEWSPAPER );
+        defaulttypes.put("Zeitschriftenheft", MediaType.MAGAZINE );
+        defaulttypes.put("???de.alt.img.label.CD???", MediaType.CD );
+        defaulttypes.put("???de.alt.img.label.BD???", MediaType.BLURAY );
     }
 
     protected final long SESSION_LIFETIME = 1000 * 60 * 3;
@@ -421,39 +450,12 @@ public class SISIS extends OkHttpBaseApi implements OpacApi {
         List<SearchResult> results = new ArrayList<>();
         List<CompletableFuture<Void>> futures = new ArrayList<>();
         for (int i = 0; i < table.size(); i++) {
-            Element tr = table.get(i);
             SearchResult sr = new SearchResult();
-            if (tr.select("td img[title]").size() > 0) {
-                String title = tr.select("td img").get(0).attr("title");
-                String[] fparts = tr.select("td img").get(0).attr("src")
-                                    .split("/");
-                String fname = fparts[fparts.length - 1];
-                MediaType default_by_fname = defaulttypes.get(fname
-                        .toLowerCase(Locale.GERMAN).replace(".jpg", "")
-                        .replace(".gif", "").replace(".png", ""));
-                MediaType default_by_title = defaulttypes.get(title);
-                MediaType default_name = default_by_title != null ? default_by_title
-                        : default_by_fname;
-                if (data.has("mediatypes")) {
-                    try {
-                        sr.setType(MediaType.valueOf(data.getJSONObject(
-                                "mediatypes").getString(fname)));
-                    } catch (JSONException | IllegalArgumentException e) {
-                        sr.setType(default_name);
-                    }
-                } else {
-                    sr.setType(default_name);
-                }
-            }
-            String alltext = tr.text();
-            if (alltext.contains("eAudio") || alltext.contains("eMusic")) {
-                sr.setType(MediaType.MP3);
-            } else if (alltext.contains("eVideo")) {
-                sr.setType(MediaType.EVIDEO);
-            } else if (alltext.contains("eBook")) {
-                sr.setType(MediaType.EBOOK);
-            } else if (alltext.contains("Munzinger")) {
-                sr.setType(MediaType.EDOC);
+            Element tr = table.get(i);
+
+            MediaTypeOrFormat mediaTypeOrFormat = getMediaTypeOrFormat(tr, "td", data);
+            if (mediaTypeOrFormat.mediaType != null){
+                sr.setType(mediaTypeOrFormat.mediaType);
             }
 
             // static covers
@@ -625,16 +627,14 @@ public class SISIS extends OkHttpBaseApi implements OpacApi {
                         description.append(part[2]);
                     }
                 }
-                if (part.length == 4) {
+                if (part.length == 5 && part[4].contains("purple")) {
+                    sr.setStatus(SearchResult.Status.YELLOW);
+                } else if (part.length >= 4) {
                     if (part[0].equals("span") && part[3].equals("textgruen")) {
                         sr.setStatus(SearchResult.Status.GREEN);
                     } else if (part[0].equals("span")
                             && part[3].equals("textrot")) {
                         sr.setStatus(SearchResult.Status.RED);
-                    }
-                } else if (part.length == 5) {
-                    if (part[4].contains("purple")) {
-                        sr.setStatus(SearchResult.Status.YELLOW);
                     }
                 }
                 if (sr.getStatus() == null) {
@@ -697,7 +697,7 @@ public class SISIS extends OkHttpBaseApi implements OpacApi {
             throws IOException {
 
         if (id.startsWith("http://") || id.startsWith("https://")) {
-            return loadDetail(id);
+            return loadDetail(httpGet(id, ENCODING));
         }
 
         // Some libraries require start parameters for start.do, like Login=foo
@@ -778,6 +778,7 @@ public class SISIS extends OkHttpBaseApi implements OpacApi {
 
         try {
             result.setId(doc.select("#bibtip_id").text().trim());
+            if ("".equals(result.getId())) result.setId(null);
         } catch (Exception ex) {
             ex.printStackTrace();
         }
@@ -790,7 +791,6 @@ public class SISIS extends OkHttpBaseApi implements OpacApi {
                 String key = hrefq.get("katkey");
                 if (key != null) {
                     result.setId(key);
-                    break;
                 }
             }
 
@@ -801,6 +801,12 @@ public class SISIS extends OkHttpBaseApi implements OpacApi {
                     reservationlinks.add(href.split("\\?")[1]);
                 }
             }
+        }
+        if (result.getId() == null && doc.select("#permalink_link").size() > 0) {
+            // another way of ID retrieval, seen in Augsburg
+            String[] link = doc.select("#permalink_link").first().text().split("/");
+            String katkey = link[link.length - 1];
+            result.setId(katkey);
         }
         if (reservationlinks.size() == 1) {
             result.setReservable(true);
@@ -1024,6 +1030,11 @@ public class SISIS extends OkHttpBaseApi implements OpacApi {
                 if (status.select("a[href*=doVormerkung]").size() == 1) {
                     copy.setResInfo(status.select("a[href*=doVormerkung]").attr("href")
                                           .split("\\?")[1]);
+                    result.setReservable(true);
+                } else if (status.select("a[href*=doBestellung]").size() == 1) {
+                    copy.setResInfo(status.select("a[href*=doBestellung]").attr("href")
+                                          .split("\\?")[1]);
+                    result.setReservable(true);
                 }
 
                 String branchtext = tr
@@ -1059,6 +1070,10 @@ public class SISIS extends OkHttpBaseApi implements OpacApi {
                         links.get(eli).attr("href")), "UTF-8");
                 for (NameValuePair nv : anyurl) {
                     if (nv.getName().equals("methodToCall")
+                            && nv.getValue().equals("parentSearch")) {
+                        result.setCollectionId(links.get(eli).absUrl("href"));
+                        break;
+                    } else if (nv.getName().equals("methodToCall")
                             && nv.getValue().equals("volumeSearch")) {
                         isvolume = links.get(eli);
                     } else if (nv.getName().equals("catKey")) {
@@ -1115,10 +1130,66 @@ public class SISIS extends OkHttpBaseApi implements OpacApi {
         }
     }
 
+    // whether we are currently waiting for the confirmation of fees
+    private boolean confirmingFees = false;
+    private String selectedCopy = null;
+    private static final int ACTION_COPY = 99;
+
     @Override
     public ReservationResult reservation(DetailedItem item, Account acc,
             int useraction, String selection) throws IOException {
+        if (useraction == 0) selectedCopy = null;
+
         String reservation_info = item.getReservation_info();
+
+        if (reservation_info == null) {
+            if (selectedCopy == null) {
+                if (useraction == ACTION_COPY) {
+                    selectedCopy = selection;
+                    reservation_info = selectedCopy;
+                    useraction = 0;
+                    selection = null;
+                } else {
+                    // copy-based reservation
+                    if (item.getCopies() == null) {
+                        return new ReservationResult(MultiStepResult.Status.ERROR);
+                    }
+
+                    List<Map<String, String>> copies = new ArrayList<>();
+                    for (Copy copy : item.getCopies()) {
+                        if (copy.getResInfo() == null) continue;
+
+                        String branch = copy.getBranch() != null ? copy.getBranch() : "";
+                        String shelfmark = copy.getShelfmark() != null ? copy.getShelfmark() : "";
+                        String status = copy.getStatus() != null ? copy.getStatus() : "";
+                        String returnDate = copy.getReturnDate() != null ?
+                                (DateTimeFormat.forPattern("dd.MM.yyyy")
+                                               .print(copy.getReturnDate())) : "";
+                        String reservations = copy.getReservations() != null ? stringProvider
+                                .getQuantityString(StringProvider.RESERVATIONS_NUMBER,
+                                        Integer.parseInt(copy.getReservations()),
+                                        Integer.parseInt(copy.getReservations())) : "";
+                        String value =
+                                branch + " " + shelfmark + " " + status + " " + returnDate + " " +
+                                        reservations;
+                        String key = copy.getResInfo();
+                        Map<String, String> selopt = new HashMap<>();
+                        selopt.put("key", key);
+                        selopt.put("value", value);
+                        copies.add(selopt);
+                    }
+                    ReservationResult result = new ReservationResult(
+                            MultiStepResult.Status.SELECTION_NEEDED);
+                    result.setMessage(stringProvider.getString(StringProvider.PICA_WHICH_COPY));
+                    result.setActionIdentifier(ACTION_COPY);
+                    result.setSelection(copies);
+                    return result;
+                }
+            } else {
+                reservation_info = selectedCopy;
+            }
+        }
+
         final String branch_inputfield = "issuepoint";
 
         Document doc = null;
@@ -1128,13 +1199,20 @@ public class SISIS extends OkHttpBaseApi implements OpacApi {
             action = "order";
         }
 
-        if (useraction == MultiStepResult.ACTION_CONFIRMATION) {
+        if (useraction == MultiStepResult.ACTION_CONFIRMATION && !confirmingFees) {
             FormBody.Builder fb = new FormBody.Builder(Charset.forName(getDefaultEncoding()))
                     .add("methodToCall", action)
                     .add("CSId", CSId);
             String html = httpPost(opac_url + "/" + action + ".do", fb.build(), ENCODING);
             doc = Jsoup.parse(html);
-        } else if (selection == null || useraction == 0) {
+        } else if (selection == null || useraction == 0 ||
+                useraction == MultiStepResult.ACTION_CONFIRMATION) {
+            boolean confirmedFees = false;
+            if (useraction == MultiStepResult.ACTION_CONFIRMATION) {
+                confirmingFees = false;
+                confirmedFees = true;
+            }
+
             String html = httpGet(opac_url + "/availability.do?"
                     + reservation_info, ENCODING);
             doc = Jsoup.parse(html);
@@ -1157,6 +1235,18 @@ public class SISIS extends OkHttpBaseApi implements OpacApi {
                     logged_in_as = acc;
                 }
             }
+
+            if (doc.select("#CirculationForm .textrot").size() >= 1 && !confirmedFees) {
+                String errmsg = doc.select("#CirculationForm .textrot").get(0).text();
+                ReservationResult result = new ReservationResult(
+                        Status.CONFIRMATION_NEEDED);
+                List<String[]> details = new ArrayList<>();
+                details.add(new String[]{"", errmsg});
+                result.setDetails(details);
+                confirmingFees = true;
+                return result;
+            }
+
             if (doc.select("input[name=expressorder]").size() > 0) {
                 FormBody.Builder fb = new FormBody.Builder(Charset.forName(getDefaultEncoding()))
                         .add(branch_inputfield, selection)
@@ -1462,20 +1552,34 @@ public class SISIS extends OkHttpBaseApi implements OpacApi {
                 return;
             }
 
-            item.setTitle(tr.child(1).select("strong").text().trim());
+            // first column can be a checkbox, then all others are shifted by one
+            int firstCol = tr.child(0).select("input[type=checkbox]").size() > 0 ? 1 : 0;
+
+            item.setTitle(tr.child(1 + firstCol).select("strong").text().trim());
+            MediaTypeOrFormat mediaTypeOrFormat = getMediaTypeOrFormat(tr, "th", data);
+            if (mediaTypeOrFormat.mediaType != null) {
+                item.setMediaType(mediaTypeOrFormat.mediaType);
+            } else {
+                item.setFormat(mediaTypeOrFormat.format);
+            }
+
             try {
-                String[] col1split = tr.child(1).html().split("<br[ /]*>");
+                String[] col1split = tr.child(1 + firstCol).html().split("<br[ /]*>");
                 item.setAuthor(col1split[1].trim());
 
                 if (col1split.length > 2 && col1split[2].contains("&nbsp;/&nbsp;")) {
                     String[] barcodeAndJournalIssue = col1split[2].split("&nbsp;/&nbsp;");
                     item.setBarcode(barcodeAndJournalIssue[0].trim());
                     if (item.getTitle() == null || item.getTitle().equals("")) {
+                        // no title - set journal issue as title
                         item.setTitle(barcodeAndJournalIssue[1].trim());
+                    } else {
+                        // append journal issue to title
+                        item.setTitle(item.getTitle() + " " + barcodeAndJournalIssue[1]);
                     }
                 }
 
-                String[] col2split = tr.child(2).html().split("<br[ /]*>");
+                String[] col2split = tr.child(2 + firstCol).html().split("<br[ /]*>");
                 String deadline = col2split[0].trim();
                 if (deadline.contains("-")) {
                     deadline = deadline.split("-")[1].trim();
@@ -1500,6 +1604,16 @@ public class SISIS extends OkHttpBaseApi implements OpacApi {
                             break;
                         }
                     }
+                } else if (tr.select("input[type=checkbox]:not([disabled])").size() > 0) {
+                    Element checkbox = tr.select("input[type=checkbox]").first();
+                    Pattern pattern = Pattern.compile("selectedMediaListentries\\[(\\d+)\\]");
+                    Matcher matcher = pattern.matcher(checkbox.attr("name"));
+                    if (matcher.find()) {
+                        String nr = matcher.group(1);
+                        item.setProlongData(
+                                offset + "$" + "methodToCall=renewalPossible&actPos=" + nr);
+                        item.setRenewable(true);
+                    }
                 } else if (tr.select(".textrot, .textgruen, .textdunkelblau")
                              .size() > 0) {
                     item.setProlongData(
@@ -1513,6 +1627,52 @@ public class SISIS extends OkHttpBaseApi implements OpacApi {
 
             media.add(item);
         }
+    }
+
+    private static class MediaTypeOrFormat{
+        SearchResult.MediaType mediaType;
+        String format;
+    }
+
+    private static MediaTypeOrFormat getMediaTypeOrFormat(Element tr, String child, JSONObject data) {
+        MediaTypeOrFormat mediaTypeOrFormat = new MediaTypeOrFormat();
+
+        if (tr.select(child + " img[title]").size() > 0) {
+            String title = tr.select(child + " img").get(0).attr("title");
+            String[] fparts = tr.select(child + " img").get(0).attr("src")
+                                .split("/");
+            String fname = fparts[fparts.length - 1];
+            MediaType default_by_fname = defaulttypes.get(fname
+                    .toLowerCase(Locale.GERMAN).replace(".jpg", "")
+                    .replace(".gif", "").replace(".png", ""));
+            MediaType default_by_title = defaulttypes.get(title);
+            MediaType default_name = default_by_title != null ? default_by_title
+                    : default_by_fname;
+            if (data.has("mediatypes")) {
+                try {
+                    mediaTypeOrFormat.mediaType = MediaType.valueOf(data.getJSONObject(
+                            "mediatypes").getString(fname));
+                } catch (JSONException | IllegalArgumentException e) {
+                    mediaTypeOrFormat.mediaType = default_name;
+                }
+            } else {
+                mediaTypeOrFormat.mediaType = default_name;
+            }
+            if (mediaTypeOrFormat.mediaType == null){
+                mediaTypeOrFormat.format = title; // fallback for new/unknown mediatypes
+            }
+        }
+        String alltext = tr.text();
+        if (alltext.contains("eAudio") || alltext.contains("eMusic")) {
+            mediaTypeOrFormat.mediaType = MediaType.MP3;
+        } else if (alltext.contains("eVideo")) {
+            mediaTypeOrFormat.mediaType = MediaType.EVIDEO;
+        } else if (alltext.contains("eBook")) {
+            mediaTypeOrFormat.mediaType = MediaType.EBOOK;
+        } else if (alltext.contains("Munzinger")) {
+            mediaTypeOrFormat.mediaType = MediaType.EDOC;
+        }
+        return mediaTypeOrFormat;
     }
 
     public static void parse_reslist6(List<ReservedItem> reservations, Document doc, int offset,
@@ -1696,7 +1856,7 @@ public class SISIS extends OkHttpBaseApi implements OpacApi {
 
     <I extends AccountItem> void loadPages(List<I> media, Document doc, Set<Integer> pagesLoaded,
             ParseAccountListFunction<I> func) throws IOException {
-        Map<String, Integer> links = getAccountPageLinks(doc);
+        Map<String, Integer> links = getAccountPageLinks(doc, opac_url);
         for (Map.Entry<String, Integer> link : links.entrySet()) {
             if (!pagesLoaded.contains(link.getValue())) {
                 String html = httpGet(link.getKey(), ENCODING);
@@ -1709,18 +1869,28 @@ public class SISIS extends OkHttpBaseApi implements OpacApi {
         }
     }
 
-    static Map<String, Integer> getAccountPageLinks(Document doc) {
+    static Map<String, Integer> getAccountPageLinks(Document doc, String opac_url) {
         Map<String, Integer> links = new HashMap<>();
         if (doc.select(".box-right").size() > 0) {
             for (Element link : doc.select(".box-right").first().select("a")) {
-                String href = link.attr("abs:href");
-                Map<String, String> hrefq = getQueryParamsFirst(href);
-                if (hrefq == null || hrefq.get("methodToCall") == null) {
-                    break;
-                }
-                if (hrefq.get("methodToCall").equals("pos")
-                        && !"1".equals(hrefq.get("anzPos"))) {
-                    links.put(href, Integer.parseInt(hrefq.get("anzPos")));
+                if (link.attr("onclick").startsWith("navigate(")) {
+                    Pattern pattern = Pattern.compile(
+                            "navigate\\('([^']+)','([0-9]+)'\\)");
+                    Matcher matcher = pattern.matcher(link.attr("onclick"));
+                    if (matcher.find()) {
+                        String url = opac_url + "/userAccount.do?methodToCall=pos&accountTyp=" + matcher.group(1) + "&anzPos=" + matcher.group(2);
+                        links.put(url, Integer.parseInt(matcher.group(2)));
+                    }
+                } else {
+                    String href = link.attr("abs:href");
+                    Map<String, String> hrefq = getQueryParamsFirst(href);
+                    if (hrefq == null || hrefq.get("methodToCall") == null) {
+                        break;
+                    }
+                    if (hrefq.get("methodToCall").equals("pos")
+                            && !"1".equals(hrefq.get("anzPos"))) {
+                        links.put(href, Integer.parseInt(hrefq.get("anzPos")));
+                    }
                 }
             }
         }

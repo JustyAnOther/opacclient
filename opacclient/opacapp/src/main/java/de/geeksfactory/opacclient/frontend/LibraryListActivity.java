@@ -13,15 +13,6 @@ import android.location.LocationManager;
 import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
-import android.support.annotation.NonNull;
-import android.support.v4.app.ActivityCompat;
-import android.support.v4.app.ActivityOptionsCompat;
-import android.support.v4.app.FragmentTransaction;
-import android.support.v4.app.ListFragment;
-import android.support.v4.view.MenuItemCompat;
-import android.support.v7.app.AppCompatActivity;
-import android.support.v7.widget.SearchView;
-import android.support.v7.widget.Toolbar;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.Menu;
@@ -36,7 +27,6 @@ import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ListView;
-import android.widget.RelativeLayout;
 import android.widget.SectionIndexer;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -57,6 +47,14 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 
+import androidx.annotation.NonNull;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.SearchView;
+import androidx.appcompat.widget.Toolbar;
+import androidx.core.app.ActivityCompat;
+import androidx.core.view.MenuItemCompat;
+import androidx.fragment.app.FragmentTransaction;
+import androidx.fragment.app.ListFragment;
 import de.geeksfactory.opacclient.BuildConfig;
 import de.geeksfactory.opacclient.OpacClient;
 import de.geeksfactory.opacclient.R;
@@ -165,25 +163,6 @@ public class LibraryListActivity extends AppCompatActivity
                 }
             }
         });
-
-        final RelativeLayout rlSuggestLibrary =
-                (RelativeLayout) findViewById(R.id.rlSuggestLibrary);
-        rlSuggestLibrary.setOnClickListener(new OnClickListener() {
-
-            @Override
-            public void onClick(View v) {
-                Intent intent = new Intent(LibraryListActivity.this,
-                        SuggestLibraryActivity.class);
-                if (getIntent().hasExtra("welcome")) {
-                    intent.putExtra("welcome", true);
-                }
-                ActivityOptionsCompat options = ActivityOptionsCompat.makeScaleUpAnimation
-                        (rlSuggestLibrary, rlSuggestLibrary.getLeft(), rlSuggestLibrary.getTop(),
-                                rlSuggestLibrary.getWidth(), rlSuggestLibrary.getHeight());
-                ActivityCompat.startActivity(LibraryListActivity.this, intent, options.toBundle());
-            }
-
-        });
     }
 
     @Override
@@ -191,6 +170,8 @@ public class LibraryListActivity extends AppCompatActivity
         if (Intent.ACTION_SEARCH.equals(intent.getAction())) {
             String query = intent.getStringExtra(SearchManager.QUERY).trim();
             search(query);
+        } else {
+            super.onNewIntent(intent);
         }
     }
 

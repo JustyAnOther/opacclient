@@ -54,6 +54,7 @@ import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
 import javax.net.ssl.X509TrustManager;
 
+import okhttp3.CipherSuite;
 import okhttp3.ConnectionSpec;
 import okhttp3.HttpUrl;
 import okhttp3.Interceptor;
@@ -69,7 +70,7 @@ import okhttp3.TlsVersion;
 public class HttpClientFactory {
 
     public String user_agent;
-    public String ssl_store_path = "../res/raw/ssl_trust_store.bks";
+    public String ssl_store_path = "ssl_trust_store.bks";
     private KeyStore trust_store;
 
     /**
@@ -95,12 +96,7 @@ public class HttpClientFactory {
     protected KeyStore getKeyStore()
             throws KeyStoreException, IOException, CertificateException, NoSuchAlgorithmException {
         final KeyStore trustStore = KeyStore.getInstance("BKS");
-        InputStream in;
-        try {
-            in = new FileInputStream(ssl_store_path);
-        } catch (FileNotFoundException e) {
-            in = new FileInputStream("../opacapp/src/main/res/raw/ssl_trust_store.bks");
-        }
+        InputStream in = Thread.currentThread().getContextClassLoader().getResourceAsStream(ssl_store_path);
         try {
             trustStore.load(in,
                     "ro5eivoijeeGohsh0daequoo5Zeepaen".toCharArray());
@@ -164,6 +160,11 @@ public class HttpClientFactory {
         }
     }
 
+    public OkHttpClient getNewOkHttpClient(boolean customssl, boolean tls_only,
+                                           boolean allCipherSuites) {
+        return getOkHttpClientBuilder(customssl, tls_only, allCipherSuites, false).build();
+    }
+
     /**
      * Create a new OkHttpClient.
      *
@@ -173,12 +174,15 @@ public class HttpClientFactory {
      *                 implementation!
      */
     public OkHttpClient getNewOkHttpClient(boolean customssl, boolean tls_only,
-            boolean allCipherSuites) {
-        return getOkHttpClientBuilder(customssl, tls_only, allCipherSuites).build();
+                                           boolean allCipherSuites,
+                                           boolean ellipticCurvesWorkaround) {
+        return getOkHttpClientBuilder(customssl, tls_only, allCipherSuites,
+                ellipticCurvesWorkaround).build();
     }
 
     protected OkHttpClient.Builder getOkHttpClientBuilder(boolean customssl, boolean tls_only,
-            boolean allCipherSuites) {
+                                                          boolean allCipherSuites,
+                                                          boolean ellipticCurvesWorkaround) {
         OkHttpClient.Builder builder = new OkHttpClient.Builder();
 
         CookieManager cookieManager = new CookieManager();
@@ -211,6 +215,16 @@ public class HttpClientFactory {
                 builder.sslSocketFactory(sf, trustManager);
 
                 List<ConnectionSpec> connectionSpecs = new ArrayList<ConnectionSpec>();
+                
+                if (ellipticCurvesWorkaround) {
+                    // fallback for Bug in Android 7.0 where only elliptic curve prime256v1 can
+                    // be used -> retry with a cipher suite without elliptic curves
+                    connectionSpecs.add(new ConnectionSpec.Builder(ConnectionSpec.MODERN_TLS)
+                            .cipherSuites(CipherSuite.TLS_DHE_RSA_WITH_AES_256_GCM_SHA384,
+                                    CipherSuite.TLS_DHE_RSA_WITH_AES_128_GCM_SHA256)
+                            .build());
+                }
+
                 connectionSpecs.add(ConnectionSpec.MODERN_TLS);
                 connectionSpecs.add(new ConnectionSpec.Builder(ConnectionSpec.COMPATIBLE_TLS)
                         .allEnabledCipherSuites()

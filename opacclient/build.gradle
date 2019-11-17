@@ -8,8 +8,8 @@ buildscript {
         google()
     }
     dependencies {
-        classpath 'com.android.tools.build:gradle:3.2.1'
-        classpath 'com.jfrog.bintray.gradle:gradle-bintray-plugin:1.6'
+        classpath 'com.android.tools.build:gradle:3.4.2'
+        classpath 'com.jfrog.bintray.gradle:gradle-bintray-plugin:1.8.4'
         classpath 'org.kt3k.gradle.plugin:coveralls-gradle-plugin:2.4.0'
         classpath 'org.json:json:20090211'
     }
@@ -29,19 +29,19 @@ jacoco {
 
 task jacocoRootReport(type: JacocoReport) {
     dependsOn = [":libopac:jacocoTestReport", ":opacapp:jacocoTestReport"]
-    executionData files(["libopac/build/jacoco/test.exec", "opacapp/build/jacoco/testDebugUnitTest.exec"])
+    executionData files(["libopac/build/jacoco/test.exec", "opacapp/build/jacoco/testGooglePlayServicesDebugUnitTest.exec"])
     sourceDirectories = files(["opacapp/src/main/java", "libopac/src/main/java"])
 
     def fileFilter = ['**/R.class', '**/R$*.class', '**/BuildConfig.*', '**/Manifest*.*', '**/*Test*.*', 'android/**/*.*']
-    def debugTree = fileTree(dir: "opacapp/build/intermediates/classes/debug", excludes: fileFilter)
+    def debugTree = fileTree(dir: "opacapp/build/intermediates/classes/googlePlayServicesDebug", excludes: fileFilter)
     def libopacDebugTree = fileTree(dir: "libopac/build/classes/java/main")
     classDirectories = files([debugTree, libopacDebugTree])
     jacocoClasspath = configurations.jacocoAnt
     reports {
         html.enabled = true
-        html.destination = "build/reports/jacoco/jacocoRootReport/html"
+        html.destination = file("build/reports/jacoco/jacocoRootReport/html")
         xml.enabled = true
-        xml.destination = "build/reports/jacoco/jacocoRootReport/jacocoRootReport.xml"
+        xml.destination = file("build/reports/jacoco/jacocoRootReport/jacocoRootReport.xml")
     }
 }
 

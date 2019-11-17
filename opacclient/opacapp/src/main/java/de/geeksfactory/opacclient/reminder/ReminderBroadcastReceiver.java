@@ -9,7 +9,6 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.preference.PreferenceManager;
-import android.support.v4.app.NotificationCompat;
 import android.util.Log;
 
 import org.joda.time.DateTime;
@@ -24,6 +23,7 @@ import org.joda.time.format.PeriodFormat;
 import java.util.ArrayList;
 import java.util.List;
 
+import androidx.core.app.NotificationCompat;
 import de.geeksfactory.opacclient.BuildConfig;
 import de.geeksfactory.opacclient.OpacClient;
 import de.geeksfactory.opacclient.R;
@@ -145,11 +145,12 @@ public class ReminderBroadcastReceiver extends BroadcastReceiver {
         // You can still return the item on the day it expires on, so don't consider it to have
         // expired before the next day
         if (alarm.deadline.isBefore(LocalDate.now())) {
-            notificationText = context
-                    .getString(R.string.notif_ticker_expired, expiringItems.size());
+            notificationText = context.getResources().getQuantityString(
+                    R.plurals.notif_ticker_expired, expiringItems.size(), expiringItems.size());
             notificationTitle = context.getString(R.string.notif_title_expired);
         } else {
-            notificationText = context.getString(R.string.notif_ticker, expiringItems.size());
+            notificationText = context.getResources().getQuantityString(
+                    R.plurals.notif_ticker, expiringItems.size(), expiringItems.size());
             notificationTitle = context.getString(R.string.notif_title);
         }
 

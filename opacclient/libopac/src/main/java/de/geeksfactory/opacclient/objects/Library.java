@@ -53,6 +53,7 @@ public class Library implements Comparable<Library> {
     private boolean account_supported;
     private boolean nfcSupported;
     private boolean suppressFeeWarnings = false;
+    private boolean supportContract = false;
 
     /**
      * Create a Library object based on a <code>JSONObject</code>.
@@ -107,6 +108,10 @@ public class Library implements Comparable<Library> {
             lib.setActive(input.getBoolean("_active"));
         }
 
+        if (input.has("_support_contract")) {
+            lib.setSupportContract(input.getBoolean("_support_contract"));
+        }
+
         if (lib.getTitle().equals(""))
             lib.setTitle(null);
 
@@ -128,6 +133,7 @@ public class Library implements Comparable<Library> {
         if (displayName != null) json.put("displayname", displayName);
         json.put("_plus_store_url", replacedby);
         json.put("_notice_text", notice_text);
+        json.put("_support_contract", supportContract);
         if (geo != null) {
             JSONArray geoJson = new JSONArray();
             geoJson.put(geo[0]);
@@ -459,5 +465,13 @@ public class Library implements Comparable<Library> {
         } else if (!ident.equals(other.ident))
             return false;
         return true;
+    }
+
+    public boolean isSupportContract() {
+        return supportContract;
+    }
+
+    public void setSupportContract(boolean supportContract) {
+        this.supportContract = supportContract;
     }
 }

@@ -24,10 +24,14 @@
         android:name="de.geeksfactory.opacclient.OpacClient"
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
+        android:usesCleartextTraffic="true"
         android:label="@string/app_name"
         android:supportsRtl="false"
         android:theme="@style/Theme.Opacapp.NoActionBar"
         tools:replace="android:supportsRtl, android:allowBackup">
+        <uses-library
+            android:name="org.apache.http.legacy"
+            android:required="false"/>
         <activity
             android:name="de.geeksfactory.opacclient.frontend.MainActivity"
             android:label="@string/launcher_name"
@@ -137,19 +141,11 @@
                 android:value="de.geeksfactory.opacclient.frontend.AccountListActivity"/>
         </activity>
         <activity
-            android:name="de.geeksfactory.opacclient.frontend.SuggestLibraryActivity"
-            android:label="@string/title_activity_suggest_library"
-            android:theme="@style/Theme.Opacapp.Floating">
-            <meta-data
-                android:name="android.support.PARENT_ACTIVITY"
-                android:value="de.geeksfactory.opacclient.frontend.LibraryListActivity"/>
-        </activity>
-        <activity
             android:name="org.acra.CrashReportDialog"
             android:excludeFromRecents="true"
             android:finishOnTaskLaunch="true"
             android:launchMode="singleInstance"
-            android:theme="@style/Theme.AppCompat.Light.Dialog"/>
+            android:theme="@style/Theme.MaterialComponents.Light.Dialog"/>
         <activity
             android:name="de.geeksfactory.opacclient.frontend.SnoozeDatePickerActivity"
             android:theme="@style/Theme.Opacapp.Transparent"/>

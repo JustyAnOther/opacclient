@@ -1,7 +1,6 @@
 package de.geeksfactory.opacclient.frontend;
 
 import android.content.Context;
-import android.support.v7.widget.RecyclerView;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -11,6 +10,7 @@ import org.joda.time.format.DateTimeFormat;
 
 import java.util.List;
 
+import androidx.recyclerview.widget.RecyclerView;
 import de.geeksfactory.opacclient.R;
 import de.geeksfactory.opacclient.objects.Copy;
 
@@ -33,6 +33,7 @@ public class CopiesAdapter extends RecyclerView.Adapter<CopiesAdapter.ViewHolder
     public void onBindViewHolder(ViewHolder holder, int position) {
         Copy copy = copies.get(position);
         setTextOrHide(copy.getBranch(), holder.tvBranch);
+        setTextOrHide(copy.getIssue(), holder.tvIssue);
         setTextOrHide(copy.getDepartment(), holder.tvDepartment);
         setTextOrHide(copy.getLocation(), holder.tvLocation);
         setTextOrHide(copy.getShelfmark(), holder.tvShelfmark);
@@ -68,6 +69,7 @@ public class CopiesAdapter extends RecyclerView.Adapter<CopiesAdapter.ViewHolder
     public class ViewHolder extends RecyclerView.ViewHolder {
         public TextView tvBranch;
         public TextView tvDepartment;
+        public TextView tvIssue;
         public TextView tvLocation;
         public TextView tvShelfmark;
         public TextView tvStatus;
@@ -79,6 +81,7 @@ public class CopiesAdapter extends RecyclerView.Adapter<CopiesAdapter.ViewHolder
             super(itemView);
             this.tvBranch = (TextView) itemView.findViewById(R.id.tvBranch);
             this.tvDepartment = (TextView) itemView.findViewById(R.id.tvDepartment);
+            this.tvIssue = (TextView) itemView.findViewById(R.id.tvIssue);
             this.tvLocation = (TextView) itemView.findViewById(R.id.tvLocation);
             this.tvShelfmark = (TextView) itemView.findViewById(R.id.tvShelfmark);
             this.tvStatus = (TextView) itemView.findViewById(R.id.tvStatus);

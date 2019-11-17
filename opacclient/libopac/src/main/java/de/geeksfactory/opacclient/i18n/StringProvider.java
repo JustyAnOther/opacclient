@@ -82,6 +82,9 @@ public interface StringProvider {
     String LINK = "link";
     String FEE_CONFIRMATION = "fee_confirmation";
     String ALL = "all";
+    String DESCRIPTION = "description";
+    String RESERVATION_READY = "reservation_ready";
+    String PLEASE_CHANGE_PASSWORD = "please_change_password";
 
     /**
      * Returns the translated string identified by identifier

@@ -216,7 +216,7 @@ open class Koha : OkHttpBaseApi() {
         }
 
         val builder = searchUrl(searchQuery!!)
-        builder.addQueryParameter("offset", (20 * page).toString())
+        builder.addQueryParameter("offset", (20 * (page - 1)).toString())
         val url = builder.build().toString()
         val doc = httpGet(url, ENCODING).html
         doc.setBaseUri(url)
@@ -285,6 +285,7 @@ open class Koha : OkHttpBaseApi() {
                             // td.classNames().contains("itype") -> media type
                             td.classNames().contains("location") -> branch = text
                             td.classNames().contains("collection") -> location = text
+                            td.classNames().contains("vol_info") -> issue = text
                             td.classNames().contains("call_no") -> {
                                 if (td.select(".isDivibibTitle").size > 0 && td.select("a").size > 0) {
                                     // Onleihe item
@@ -325,6 +326,9 @@ open class Koha : OkHttpBaseApi() {
         return null
     }
 
+    var reservationFeeConfirmed = false
+    val ACTION_ITEM = 101
+
     override fun reservation(item: DetailedItem, account: Account, useraction: Int, selection: String?): OpacApi.ReservationResult {
         try {
             login(account)
@@ -332,10 +336,29 @@ open class Koha : OkHttpBaseApi() {
             return OpacApi.ReservationResult(OpacApi.MultiStepResult.Status.ERROR, e.message)
         }
 
+        var selectedCopy: String? = null
+
+        when (useraction) {
+            0 -> reservationFeeConfirmed = false
+            OpacApi.MultiStepResult.ACTION_CONFIRMATION -> reservationFeeConfirmed = true
+            ACTION_ITEM -> selectedCopy = selection
+        }
+
         var doc = httpGet("$baseurl/cgi-bin/koha/opac-reserve.pl?biblionumber=${item.id}", ENCODING).html
 
         if (doc.select(".alert").size > 0) {
-            return OpacApi.ReservationResult(OpacApi.MultiStepResult.Status.ERROR, doc.select(".alert").text())
+            val alert = doc.select(".alert").first()
+            val message = alert.text
+            if (alert.id() == "reserve_fee") {
+                if (!reservationFeeConfirmed) {
+                    val res = OpacApi.ReservationResult(
+                            OpacApi.MultiStepResult.Status.CONFIRMATION_NEEDED)
+                    res.details = arrayListOf(arrayOf(message))
+                    return res
+                }
+            } else {
+                return OpacApi.ReservationResult(OpacApi.MultiStepResult.Status.ERROR, message)
+            }
         }
 
         val body = FormBody.Builder()
@@ -346,9 +369,42 @@ open class Koha : OkHttpBaseApi() {
         body.add("single_bib", item.id)
         body.add("expiration_date_${item.id}", "")
         body.add("reqtype_${item.id}", "any")
-        val checkbox = doc.select("input[name=checkitem_${item.id}]").first()
-        if (checkbox != null) {
-            body.add("checkitem_${item.id}", checkbox["value"])
+        val checkboxes = doc.select("input[name=checkitem_${item.id}]")
+        if (checkboxes.size > 0) {
+            if (checkboxes.first()["value"] == "any") {
+                body.add("checkitem_${item.id}", "any")
+            } else {
+                if (selectedCopy != null) {
+                    body.add("checkitem_${item.id}", selectedCopy)
+                } else {
+                    val copies = doc.select(".copiesrow tr:has(td)")
+                    val activeCopies = copies.filter { row ->
+                        !row.select("input").first().hasAttr("disabled")
+                    }
+                    if (copies.size > 0 && activeCopies.isEmpty()) {
+                        return OpacApi.ReservationResult(
+                                OpacApi.MultiStepResult.Status.ERROR,
+                                stringProvider.getString(StringProvider.NO_COPY_RESERVABLE)
+                        )
+                    }
+                    // copy selection
+                    return OpacApi.ReservationResult(
+                            OpacApi.MultiStepResult.Status.SELECTION_NEEDED,
+                            doc.select(".copiesrow caption").text).apply {
+                        actionIdentifier = ACTION_ITEM
+                        setSelection(activeCopies.map { row ->
+                            HashMap<String, String>().apply {
+                                put("key", row.select("input").first()["value"])
+                                put("value", "${row.select(".itype").text}\n${row.select("" +
+                                        ".homebranch").text}\n${row.select(".information").text}")
+                            }
+                        })
+                    }
+                }
+            }
+        } else if (doc.select(".holdrow .alert").size > 0) {
+            return OpacApi.ReservationResult(OpacApi.MultiStepResult.Status.ERROR,
+                    doc.select(".holdrow .alert").text().trim())
         }
 
         doc = httpPost("$baseurl/cgi-bin/koha/opac-reserve.pl", body.build(), ENCODING).html
@@ -379,7 +435,17 @@ open class Koha : OkHttpBaseApi() {
     }
 
     override fun prolongAll(account: Account, useraction: Int, selection: String?): OpacApi.ProlongAllResult {
-        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
+        var doc = login(account)
+        var borrowernumber = doc.select("input[name=borrowernumber]").first()?.attr("value")
+
+        doc = Jsoup.parse(httpGet("$baseurl/cgi-bin/koha/opac-renew.pl?from=opac_user&borrowernumber=$borrowernumber", ENCODING))
+        val label = doc.select(".blabel").first()
+        if (label != null && label.hasClass("label-success")) {
+            return OpacApi.ProlongAllResult(OpacApi.MultiStepResult.Status.OK)
+        } else {
+            return OpacApi.ProlongAllResult(OpacApi.MultiStepResult.Status.ERROR, label?.text()
+                    ?: stringProvider.getString(StringProvider.ERROR))
+        }
     }
 
     override fun cancel(media: String, account: Account, useraction: Int, selection: String?): OpacApi.CancelResult {
@@ -416,12 +482,12 @@ open class Koha : OkHttpBaseApi() {
         return accountData
     }
 
-    private fun parseFees(feesDoc: Document): String? {
+    internal fun parseFees(feesDoc: Document): String? {
         val text = feesDoc.select("td.sum").text()
         return if (!text.isBlank()) text else null
     }
 
-    private fun <I : AccountItem> parseItems(doc: Document, constructor: () -> I, id: String): List<I> {
+    internal fun <I : AccountItem> parseItems(doc: Document, constructor: () -> I, id: String): List<I> {
         val lentTable = doc.select(id).first() ?: return emptyList()
 
         return lentTable.select("tbody tr").map { row ->
@@ -454,10 +520,13 @@ open class Koha : OkHttpBaseApi() {
                         if (input != null) {
                             item.prolongData = input.attr("value")
                             item.isRenewable = true
+                            item.status = col.select("span.renewals").text()
                         } else {
                             item.prolongData = NOT_RENEWABLE + content
                             item.isRenewable = false
+                            item.status = col.text()
                         }
+                        item.status = item.status.trim().replaceFirst(Regex("^\\(?(.*?)\\)?\$"), "$1")
                     }
                     // "call_no" -> Signatur
                     // "fines" -> Gebühren (Ja/Nein)
@@ -502,7 +571,8 @@ open class Koha : OkHttpBaseApi() {
     }
 
     override fun getSupportFlags(): Int {
-        return OpacApi.SUPPORT_FLAG_ENDLESS_SCROLLING
+        return OpacApi.SUPPORT_FLAG_ENDLESS_SCROLLING or OpacApi.SUPPORT_FLAG_ACCOUNT_PROLONG_ALL or
+                OpacApi.SUPPORT_FLAG_WARN_RESERVATION_FEES
     }
 
     override fun getSupportedLanguages(): Set<String>? {

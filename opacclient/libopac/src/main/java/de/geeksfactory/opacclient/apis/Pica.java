@@ -22,9 +22,7 @@
 package de.geeksfactory.opacclient.apis;
 
 import org.apache.http.NameValuePair;
-import org.apache.http.client.CookieStore;
 import org.apache.http.client.utils.URLEncodedUtils;
-import org.apache.http.impl.client.BasicCookieStore;
 import org.apache.http.message.BasicNameValuePair;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
@@ -75,7 +73,7 @@ import de.geeksfactory.opacclient.utils.ISBNTools;
  * @author Johan von Forstner, 16.09.2013
  */
 
-public abstract class Pica extends ApacheBaseApi implements OpacApi {
+public abstract class Pica extends OkHttpBaseApi implements OpacApi {
 
     protected static HashMap<String, MediaType> defaulttypes = new HashMap<>();
     protected static HashMap<String, String> languageCodes = new HashMap<>();
@@ -113,7 +111,6 @@ public abstract class Pica extends ApacheBaseApi implements OpacApi {
     protected String db;
     protected String pwEncoded;
     protected String languageCode;
-    protected CookieStore cookieStore = new BasicCookieStore();
     protected String lor_reservations;
 
     @Override
@@ -209,7 +206,7 @@ public abstract class Pica extends ApacheBaseApi implements OpacApi {
                 opac_url + "/LNG=" + getLang() + "/DB=" + db
                         + "/SET=1/TTL=1/CMD?"
                         + URLEncodedUtils.format(params, getDefaultEncoding()),
-                getDefaultEncoding(), false, cookieStore);
+                getDefaultEncoding());
 
         return parse_search(html, 1);
     }
@@ -219,7 +216,7 @@ public abstract class Pica extends ApacheBaseApi implements OpacApi {
         String html = httpGet(
                 opac_url + "/LNG=" + getLang() + "/DB=" + db + "/SET=1/TTL=1"
                         + "/FAM?PPN=" + query.get("ppn"),
-                getDefaultEncoding(), false, cookieStore);
+                getDefaultEncoding());
         return parse_search(html, 1);
     }
 
@@ -397,7 +394,7 @@ public abstract class Pica extends ApacheBaseApi implements OpacApi {
         String html = httpGet(opac_url + "/LNG=" + getLang() + "/DB=" + db
                         + "/SET=" + searchSet + "/TTL=1/NXT?FRST="
                         + (((page - 1) * resultcount) + 1), getDefaultEncoding(),
-                false, cookieStore);
+                false);
         return parse_search(html, page);
     }
 
@@ -440,7 +437,7 @@ public abstract class Pica extends ApacheBaseApi implements OpacApi {
         String html = httpGet(opac_url + "/LNG=" + getLang() + "/DB=" + db
                         + "/LNG=" + getLang() + "/SET=" + searchSet
                         + "/TTL=1/SHW?FRST=" + (position + 1), getDefaultEncoding(),
-                false, cookieStore);
+                false);
 
         return parse_result(html);
     }
@@ -738,6 +735,12 @@ public abstract class Pica extends ApacheBaseApi implements OpacApi {
             field.setId("SRT");
             for (Element option : sort.select("option")) {
                 field.addDropdownValue(option.attr("value"), option.text());
+                if ("RLV".equals(option.attr("value"))) {
+                    // move "relevance" option to the top to make it the default
+                    field.getDropdownValues().add(0,
+                            field.getDropdownValues().remove(
+                                    field.getDropdownValues().size() - 1));
+                }
             }
             fields.add(field);
         }

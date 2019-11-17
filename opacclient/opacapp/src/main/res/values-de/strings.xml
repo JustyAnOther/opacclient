@@ -43,7 +43,7 @@
     <string name="doing_cancel">Vorbestellung wird gelöscht…</string>
     <string name="doing_prolong">Verlängerung wird durchgeführt…</string>
     <string name="doing_download">Download-Informationen werden abgerufen</string>
-    <string name="reader_needed">Um die E-Book-Datei zu lesen, benötigen Sie eine weitere App, z.B. Bluefire Reader. Klicken Sie auf Ignorieren, wenn Sie bereits eine solche App haben. Diese Meldung erscheint dann nicht wieder. Klicken Sie auf Download, um in den Play Store zu gelangen und Bluefire Reader herunterzuladen.</string>
+    <string name="reader_needed">Um die E-Book-Datei zu lesen, benötigen Sie eine weitere App, z.B. Aldiko. Klicken Sie auf Ignorieren, wenn Sie bereits eine solche App haben. Diese Meldung erscheint dann nicht wieder. Klicken Sie auf Download, um in den Play Store zu gelangen und Aldiko herunterzuladen.</string>
     <string name="reader_needed_overdrive">Um dieses Medium zu öffnen, benötigen Sie eine weitere App, z.B. die OverDrive-App. Klicken Sie auf Ignorieren, wenn Sie bereits eine solche App haben. Diese Meldung erscheint dann nicht wieder. Klicken Sie auf Download, um in den Play Store zu gelangen und OverDrive herunterzuladen.</string>
     <string name="reader_needed_ignore">Ignorieren</string>
     <string name="doing_prolong_all">Medien, die verlängert werden können, werden verlängert…</string>
@@ -85,9 +85,15 @@
     </string-array>
     <string name="notification_warning">Warnzeitraum</string>
     <string name="notification_warning_desc">Wie lange vorher soll benachrichtigt werden?</string>
-    <string name="notif_ticker">%d Medien müssen abgegeben oder verlängert werden!</string>
+    <plurals name="notif_ticker">
+        <item quantity="one">%d Medium muss abgegeben oder verlängert werden!</item>
+        <item quantity="other">%d Medien müssen abgegeben oder verlängert werden!</item>
+    </plurals>
     <string name="notif_title">Medien laufen ab</string>
-    <string name="notif_ticker_expired">%d Medien sind bereits abgelaufen!</string>
+    <plurals name="notif_ticker_expired">
+        <item quantity="one">%d Medium ist bereits abgelaufen!</item>
+        <item quantity="other">%d Medien sind bereits abgelaufen!</item>
+    </plurals>
     <string name="notif_title_expired">Medien sind abgelaufen</string>
     <string name="notif_plus_more">+%d weitere</string>
     <string name="notif_snooze">Später</string>
@@ -104,14 +110,14 @@
     <string name="share_notsupported">In dieser Bibliothek nicht unterstützt</string>
     <string name="unsupported">Funktion nicht unterstützt</string>
     <string name="account_unsupported_api">Diese Funktion wird in deiner Bibliothek noch nicht unterstützt. Tut uns leid \uD83D\uDE1E</string>
-    <string name="account_unsupported_api_opensource"><![CDATA[Diese Funktion wird in deiner Bibliothek noch nicht unterstützt. Tut uns leid \uD83D\uDE1E<br><br>Wenn du programmieren kannst und etwas Zeit hast, kannst du uns vielleicht helfen, diese Funktion zu implementieren. Weitere Informationen bekommst du bei <a href="https://github.com/opacapp/opacclient">GitHub</a> unter von uns per <a href="mailto:info@opacapp.net">E-Mail</a>]]>.</string>
+    <string name="account_unsupported_api_opensource"><![CDATA[Diese Funktion wird in deiner Bibliothek noch nicht unterstützt. Tut uns leid \uD83D\uDE1E<br><br>Wenn du programmieren kannst und etwas Zeit hast, kannst du uns vielleicht helfen, diese Funktion zu implementieren. Weitere Informationen bekommst du bei <a href="https://github.com/opacapp/opacclient">GitHub</a>]]>.</string>
     <string name="write_mail">E-Mail schreiben</string>
     <string name="info_error">Die zusätzlichen Informationen der Bibliothek konnten nicht abgerufen werden.</string>
     <string name="info_unsupported">Deine Bücherei stellt keine zusätzlichen Informationen bereit, die wir dir anzeigen könnten.</string>
     <string name="connection_error_detail">Der Aufbau einer Verbindung zum Bibliotheksserver ist fehlgeschlagen. Prüfe, ob eine Verbindung zum Internet verfügbar ist. Möglicherweise hat auch der Bibliotheksserver ein Problem oder die App konnte seine Antwort nicht auswerten.</string>
     <string name="connection_error_detail_nre">Der Aufbau einer Verbindung zum Bibliotheksserver ist fehlgeschlagen. Prüfe, ob eine Verbindung zum Internet verfügbar ist. Wenn ja, hat wahrscheinlich der Bibliotheksserver ein Problem.</string>
     <string name="retry">Erneut versuchen</string>
-    <string name="connection_error_detail_security">Der Aufbau einer gesicherten Verbindung zum Bibliotheksserver ist fehlgeschlagen. Bitte probiere es erneut. Wenn das Problem fortbesteht, versucht eventuell jemand, die Verbindung abzuhören. Bitte wende dich an info@opacapp.de, wenn das Problem verschiedenen WLAN-Netzwerken fortbesteht.</string>
+    <string name="connection_error_detail_security">Der Aufbau einer gesicherten Verbindung zum Bibliotheksserver ist fehlgeschlagen. Bitte probiere es erneut. Wenn das Problem fortbesteht, versucht eventuell jemand, die Verbindung abzuhören. Bitte wende dich an https://opac.app/de/support/, wenn das Problem verschiedenen WLAN-Netzwerken fortbesteht.</string>
     <string name="default_account_name">Unbenanntes Konto</string>
     <string name="title_activity_account_list">Konten</string>
     <string name="account_add">Konto hinzufügen</string>
@@ -226,6 +232,8 @@
     <string name="website_url">www.opacapp.de</string>
     <string name="developer">Entwickler</string>
     <string name="feedback">Feedback</string>
+    <string name="support">Support</string>
+	<string name="support_url">https://opac.app/de/support/</string>
     <string name="rate">Applikation bewerten</string>
     <string name="other">Sonstiges</string>
     <string name="source">Quellcode</string>
@@ -237,6 +245,7 @@
     <string name="return_date">Rückgabedatum</string>
     <string name="location">Standort</string>
     <string name="department">Abteilung</string>
+    <string name="issue">Ausgabe</string>
     <string name="reservations">Reservierungen</string>
     <string name="barcode">Barcode</string>
     <string name="clear_search">Formular leeren</string>
@@ -304,7 +313,7 @@
     <string name="library_config_last_update">Zuletzt aktualisiert %s</string>
     <string name="library_config_last_update_never">Noch keine Daten geladen</string>
     <string name="library_config_reset">Bibliotheksdaten vom letzten App-Update wiederhergestellt.</string>
-    <string name="library_removed_error">Ihre Bibliothek wurde leider aus der App entfernt. Gründe dafür könnten sein, dass die Bibliothek zu einer anderen Software gewechselt hat, mit der die App nicht kompatibel ist, oder, dass die Bibliothek uns direkt kontaktiert hat und explizit darum gebeten hat, aus der App entfernt zu werden. Für weitere Informationen können Sie uns unter info@opacapp.net kontaktieren.</string>
+    <string name="library_removed_error">Ihre Bibliothek wurde leider aus der App entfernt. Gründe dafür könnten sein, dass die Bibliothek zu einer anderen Software gewechselt hat, mit der die App nicht kompatibel ist, oder, dass die Bibliothek uns direkt kontaktiert hat und explizit darum gebeten hat, aus der App entfernt zu werden. Für weitere Informationen können Sie uns unter https://opac.app/en/support/ kontaktieren.</string>
     <string name="account_anonymous">anonym (nur Suche)</string>
     <string name="account_with_credentials">mit Zugangsdaten (Suche und Konto)</string>
     <string name="please_enter_password">Bitte geben Sie Ihr Passwort ein.</string>
@@ -327,4 +336,9 @@
     <string name="load_covers_mobile_data">Buchcover über mobiles Netzwerk laden</string>
     <string name="load_covers_mobile_data_on">Buchcover werden geladen und angezeigt, wenn verfügbar</string>
     <string name="load_covers_mobile_data_off">Buchcover werden nur über WLAN geladen</string>
+    <string name="account_ptr_hint">Sie können auch die Liste nach unten ziehen, um die Daten neu zu laden.</string>
+    <string name="support_policy_hint">Für die Nutzung dieser Bibliothek in der App gibt es
+        keinen kostenfreien Support, eventuelle zukünftige Fehler werden wahrscheinlich nicht
+        behoben.</string>
+    <string name="support_policy_more_info">mehr Infos</string>
 </resources>

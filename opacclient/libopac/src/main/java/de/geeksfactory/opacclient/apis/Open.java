@@ -18,6 +18,7 @@
  */
 package de.geeksfactory.opacclient.apis;
 
+import org.apache.http.client.utils.URIBuilder;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
 import org.json.JSONArray;
@@ -31,6 +32,7 @@ import org.jsoup.select.Elements;
 
 import java.io.IOException;
 import java.net.MalformedURLException;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -66,6 +68,7 @@ import okhttp3.Headers;
 import okhttp3.MediaType;
 import okhttp3.MultipartBody;
 import okhttp3.RequestBody;
+import okhttp3.ResponseBody;
 
 import static okhttp3.MultipartBody.Part.create;
 
@@ -310,10 +313,11 @@ public class Open extends OkHttpBaseApi implements OpacApi {
     protected SearchRequestResult parse_search(Document doc, int page) throws OpacErrorException {
         searchResultDoc = doc;
 
-        if (doc.select("#Label1, span[id$=LblInfoMessage]").size() > 0) {
-            String message = doc.select("#Label1, span[id$=LblInfoMessage]").text();
+        if (doc.select("#Label1, span[id$=LblInfoMessage], .oclc-searchmodule-searchresult > " +
+                ".boldText").size() > 0) {
+            String message = doc.select("#Label1, span[id$=LblInfoMessage], .boldText").text();
             if (message.contains("keine Treffer")) {
-                return new SearchRequestResult(new ArrayList<SearchResult>(), 0, 1, page);
+                return new SearchRequestResult(new ArrayList<>(), 0, 1, page);
             } else {
                 throw new OpacErrorException(message);
             }
@@ -330,6 +334,9 @@ public class Open extends OkHttpBaseApi implements OpacApi {
 
         Pattern idPattern = Pattern.compile("\\$(mdv|civ|dcv)(\\d+)\\$");
         Pattern weakIdPattern = Pattern.compile("(mdv|civ|dcv)(\\d+)[^\\d]");
+
+        // Determine portalID value for availability
+        AvailabilityRestInfo restInfo = getAvailabilityRestInfo(doc);
 
         Elements elements = doc.select("div[id$=divMedium], div[id$=divComprehensiveItem], div[id$=divDependentCatalogue]");
         List<SearchResult> results = new ArrayList<>();
@@ -378,6 +385,8 @@ public class Open extends OkHttpBaseApi implements OpacApi {
             String subtitle = catalogueContent.select("span[id$=LblSubTitleValue]").text();
             String author = catalogueContent.select("span[id$=LblAuthorValue]").text();
             String year = catalogueContent.select("span[id$=LblProductionYearValue]").text();
+            String mediumIdentifier =
+                    catalogueContent.select("span[id$=LblMediumIdentifierValue]").text();
             String series = catalogueContent.select("span[id$=LblSeriesValue]").text();
 
             // Some libraries, such as Bern, have labels but no <span id="..Value"> tags
@@ -405,6 +414,7 @@ public class Open extends OkHttpBaseApi implements OpacApi {
             text.append("<b>").append(title).append("</b>");
             if (!subtitle.equals("")) text.append("<br/>").append(subtitle);
             if (!author.equals("")) text.append("<br/>").append(author);
+            if (!mediumIdentifier.equals("")) text.append("<br/>").append(mediumIdentifier);
             if (!year.equals("")) text.append("<br/>").append(year);
             if (!series.equals("")) text.append("<br/>").append(series);
 
@@ -423,39 +433,47 @@ public class Open extends OkHttpBaseApi implements OpacApi {
 
             // Availability
             if (result.getId() != null) {
-                String url = opac_url +
-                        "/DesktopModules/OCLC.OPEN.PL.DNN.SearchModule/SearchService" +
-                        ".asmx/GetAvailability";
                 String culture = element.select("input[name$=culture]").val();
+                String ekzid = element.select("input[name$=ekzid]").val();
+                boolean ebook = !ekzid.equals("");
+
+                String url;
+                if (ebook) {
+                    url = restInfo.ebookRestUrl != null ? restInfo.ebookRestUrl :
+                            opac_url + "/DesktopModules/OCLC.OPEN.PL.DNN.CopConnector/Services" +
+                                    "/Onleihe.asmx/GetNcipLookupItem";
+                } else {
+                    url = restInfo.restUrl != null ? restInfo.restUrl :
+                            opac_url + "/DesktopModules/OCLC.OPEN.PL.DNN.SearchModule/" +
+                                    "SearchService.asmx/GetAvailability";
+                }
+
                 JSONObject data = new JSONObject();
                 try {
-
-                    // Determine portalID value
-                    int portalId = 1;
-                    for (Element scripttag : doc.select("script")) {
-                        String scr = scripttag.html();
-                        if (scr.contains("LoadSharedCatalogueViewAvailabilityAsync")) {
-                            Pattern portalIdPattern = Pattern.compile(
-                                    ".*LoadSharedCatalogueViewAvailabilityAsync\\([^,]*,[^,]*," +
-                                            "[^0-9,]*([0-9]+)[^0-9,]*,.*\\).*");
-                            Matcher portalIdMatcher = portalIdPattern.matcher(scr);
-                            if (portalIdMatcher.find()) {
-                                portalId = Integer.parseInt(portalIdMatcher.group(1));
-                            }
-                        }
+                    if (ebook) {
+                        data.put("portalId", restInfo.portalId).put("itemid", ekzid)
+                            .put("language", culture);
+                    } else {
+                        data.put("portalId", restInfo.portalId).put("mednr", result.getId())
+                            .put("culture", culture).put("requestCopyData", false)
+                            .put("branchFilter", "");
                     }
-
-                    data.put("portalId", portalId).put("mednr", result.getId())
-                        .put("culture", culture).put("requestCopyData", false)
-                        .put("branchFilter", "");
                     RequestBody entity = RequestBody.create(MEDIA_TYPE_JSON, data.toString());
 
                     futures.add(asyncPost(url, entity, false).handle((response, throwable) -> {
                         if (throwable != null) return null;
+                        ResponseBody body = response.body();
                         try {
-                            JSONObject availabilityData = new JSONObject(response.body().string());
-                            String isAvail =
-                                    availabilityData.getJSONObject("d").getString("IsAvail");
+                            JSONObject availabilityData = new JSONObject(body.string());
+                            String isAvail;
+                            if (ebook) {
+                                isAvail = availabilityData
+                                        .getJSONObject("d").getJSONObject("LookupItem")
+                                        .getString("Available");
+                            } else {
+                                isAvail = availabilityData
+                                        .getJSONObject("d").getString("IsAvail");
+                            }
                             switch (isAvail) {
                                 case "true":
                                     result.setStatus(SearchResult.Status.GREEN);
@@ -470,6 +488,7 @@ public class Open extends OkHttpBaseApi implements OpacApi {
                         } catch (JSONException | IOException e) {
                             e.printStackTrace();
                         }
+                        body.close();
                         return null;
                     }));
                 } catch (JSONException e) {
@@ -483,6 +502,48 @@ public class Open extends OkHttpBaseApi implements OpacApi {
         CompletableFuture.allOf(futures.toArray(new CompletableFuture[futures.size()])).join();
 
         return new SearchRequestResult(results, totalCount, page);
+    }
+
+    private AvailabilityRestInfo getAvailabilityRestInfo(Document doc) {
+        AvailabilityRestInfo info = new AvailabilityRestInfo();
+        info.portalId = 1;
+        for (Element scripttag : doc.select("script")) {
+            String scr = scripttag.html();
+            if (scr.contains("LoadSharedCatalogueViewAvailabilityAsync")) {
+                Pattern pattern = Pattern.compile(
+                        ".*LoadSharedCatalogueViewAvailabilityAsync\\(\"([^,]*)\",\"([^,]*)\"," +
+                                "[^0-9,]*([0-9]+)[^0-9,]*,.*\\).*");
+                Matcher matcher = pattern.matcher(scr);
+                if (matcher.find()) {
+                    info.restUrl = getAbsoluteUrl(opac_url, matcher.group(1));
+                    info.ebookRestUrl = getAbsoluteUrl(opac_url, matcher.group(2));
+                    info.portalId = Integer.parseInt(matcher.group(3));
+                }
+            }
+        }
+
+
+        return info;
+    }
+
+    protected static String getAbsoluteUrl(String baseUrl, String url) {
+        if (!url.contains("://")) {
+            try {
+                URIBuilder uriBuilder = new URIBuilder(baseUrl);
+                url = uriBuilder.setPath(url)
+                                .build()
+                                .normalize().toString();
+            } catch (URISyntaxException e) {
+                e.printStackTrace();
+            }
+        }
+        return url;
+    }
+
+    private class AvailabilityRestInfo {
+        public int portalId;
+        public String restUrl;
+        public String ebookRestUrl;
     }
 
     private List<String> getCoverUrlList(Element img) {
@@ -749,7 +810,11 @@ public class Open extends OkHttpBaseApi implements OpacApi {
                     }
 
                     if (text.equals("")) continue;
-                    copy.set(columnmap.get(j), text, fmt);
+                    String colname = columnmap.get(j);
+                    if (copy.get(colname) != null && !copy.get(colname).isEmpty()) {
+                        text = copy.get(colname) + " / " + text;
+                    }
+                    copy.set(colname, text, fmt);
                 }
                 item.addCopy(copy);
             }
@@ -808,6 +873,8 @@ public class Open extends OkHttpBaseApi implements OpacApi {
                 return "branch";
             case "Standorte":
             case "Standort":
+            case "Standort 2":
+            case "Standort 3":
                 return "location";
             case "Status":
                 return "status";
@@ -818,6 +885,8 @@ public class Open extends OkHttpBaseApi implements OpacApi {
                 return "returndate";
             case "Signatur":
                 return "signature";
+            case "Barcode":
+                return "barcode";
             default:
                 return null;
         }
@@ -1048,7 +1117,7 @@ public class Open extends OkHttpBaseApi implements OpacApi {
      */
     protected static MultipartBody.Builder formData(FormElement form, String submitName) {
         MultipartBody.Builder data = new MultipartBody.Builder();
-        data.setType(MediaType.parse("multipart/form-data; charset=utf-8"));
+        data.setType(MediaType.parse("multipart/form-data"));
 
         // data.setCharset somehow breaks everything in Bern.
         // data.addTextBody breaks utf-8 characters in select boxes in Bern

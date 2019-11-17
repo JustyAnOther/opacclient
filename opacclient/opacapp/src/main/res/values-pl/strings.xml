@@ -43,7 +43,7 @@
     <string name="doing_cancel">Rezerwacja jest anulowana...</string>
     <string name="doing_prolong">Dokonywanie odnowienia...</string>
     <string name="doing_download">Informacje są pobierane...</string>
-    <string name="reader_needed">Aby czytać e-booki potrzebujesz osobnej aplikacji, np \'Bluefire Reader\'. Kliknij \'Ignoruj\' jeśli posiadasz już taką aplikację, w takim wypadku ta informacja nie pojawi się ponownie. Kliknij \'Pobierz\' aby otworzyć Sklep Play i pobrać  Bluefire Reader.</string>
+    <string name="reader_needed">Aby czytać e-booki potrzebujesz osobnej aplikacji, np \'Aldiko\'. Kliknij \'Ignoruj\' jeśli posiadasz już taką aplikację, w takim wypadku ta informacja nie pojawi się ponownie. Kliknij \'Pobierz\' aby otworzyć Sklep Play i pobrać  Aldiko.</string>
     <string name="reader_needed_ignore">Ignoruj</string>
     <string name="doing_prolong_all">Wszystkie odnawialne pozycje są odnawiane...</string>
     <string name="prolong_all_confirm">Czy na pewno odnowić wszystkie pozycje na tym koncie? Niektóre biblioteki mogą naliczyć opłaty.</string>
@@ -83,9 +83,19 @@
     </string-array>
     <string name="notification_warning">Okres ostrzeżenia</string>
     <string name="notification_warning_desc">Jak długo przed przedawnieniem powinno być pokazane powiadomienie.</string>
-    <string name="notif_ticker">%d pozycji wkrótce wygaśnie.</string>
+    <plurals name="notif_ticker">
+        <item quantity="one">%d pozycja wkrótce wygaśnie.</item>
+        <item quantity="few">%d pozycje wkrótce wygasną.</item>
+        <item quantity="many">%d pozycji wkrótce wygaśnie.</item>
+        <item quantity="other">%d pozycje wkrótce wygaśnie.</item>
+    </plurals>
     <string name="notif_title">Pozycje które wygasają</string>
-    <string name="notif_ticker_expired">%d pozycji wygasło!</string>
+    <plurals name="notif_ticker_expired">
+        <item quantity="one">%d pozycja wygasła!</item>
+        <item quantity="few">%d pozycje wygasły!</item>
+        <item quantity="many">%d pozycji wygasło!</item>
+        <item quantity="other">%d pozycje wygasły!</item>
+    </plurals>
     <string name="notif_title_expired">Pozycje wygasły</string>
     <string name="notif_plus_more">+%d więcej</string>
     <string name="notif_snooze">Później</string>
@@ -108,7 +118,7 @@
     <string name="connection_error_detail">Połączenie do serwera tej biblioteki nie powiodło się. Sprawdź połączenie z internetem. Jeśli problem powtarza się powodem może być awaria serwera lub aplikacja nie potrafi zinterpretować odpowiedzi serwera.</string>
     <string name="connection_error_detail_nre">Połączenie do serwera tej biblioteki nie powiodło się. Sprawdź połączenie z internetem. Jeśli problem powtarza się powodem może być awaria serwera.</string>
     <string name="retry">Spróbuj ponownie</string>
-    <string name="connection_error_detail_security">Bezpieczne połączenie do serwera biblioteki nie powiodło się. Spróbuj ponownie. Jeśli problem się powtarza, być może ktoś przechwytuje twoje połączenie. Skontaktuj się z info@opacapp.de jeśli problem powtarza się na wielu różnych sieciach WiFi. </string>
+    <string name="connection_error_detail_security">Bezpieczne połączenie do serwera biblioteki nie powiodło się. Spróbuj ponownie. Jeśli problem się powtarza, być może ktoś przechwytuje twoje połączenie. Skontaktuj się z https://opac.app/en/support/ jeśli problem powtarza się na wielu różnych sieciach WiFi. </string>
     <string name="default_account_name">Nienazwane konto</string>
     <string name="title_activity_account_list">Konta</string>
     <string name="account_add">Dodaj konto</string>
