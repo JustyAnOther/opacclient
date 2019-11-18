@@ -1826,7 +1826,12 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
                     if (label == null && row.select("select").size() == 1) {
                         label = row.select("label").first();
                     }
-                    if (label != null) field.setDisplayName(label.text());
+                    if (label != null) {
+                        field.setDisplayName(label.text());
+                        if (field.getDisplayName().matches("Verf.+gbarkeit")) {
+                            field.setMeaning(SearchField.Meaning.AVAILABLE);
+                        }
+                    }
                     for (Element opt : select.select("option")) {
                         field.addDropdownValue(opt.attr("value"), opt.text());
                     }
