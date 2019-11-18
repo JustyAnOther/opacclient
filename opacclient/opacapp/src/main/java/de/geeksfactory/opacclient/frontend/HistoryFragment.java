@@ -209,6 +209,9 @@ public class HistoryFragment extends Fragment implements
         } else if (item.getItemId() == R.id.action_sort_author) {
             sort("author");
             return true;
+        } else if (item.getItemId() == R.id.action_sort_title) {
+            sort("title");
+            return true;
         } else if (item.getItemId() == R.id.action_sort_firstDate) {
             sort("firstDate");
             return true;
