@@ -27,26 +27,34 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.database.Cursor;
+import android.graphics.Typeface;
 import android.net.Uri;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
 import android.text.Html;
+import android.text.SpannableStringBuilder;
+import android.text.TextUtils;
+import android.text.style.StyleSpan;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.MenuInflater;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.view.ViewGroup;
+import android.view.ViewTreeObserver;
 import android.widget.AbsListView;
 import android.widget.AdapterView;
 import android.widget.AdapterView.OnItemClickListener;
 import android.widget.ImageView;
 import android.widget.ListView;
+import android.widget.RelativeLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import com.google.android.material.snackbar.Snackbar;
 
+import org.joda.time.format.DateTimeFormat;
+import org.joda.time.format.DateTimeFormatter;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -70,22 +78,21 @@ import de.geeksfactory.opacclient.OpacClient;
 import de.geeksfactory.opacclient.R;
 import de.geeksfactory.opacclient.frontend.OpacActivity.AccountSelectedListener;
 import de.geeksfactory.opacclient.objects.Account;
-import de.geeksfactory.opacclient.objects.SearchResult;
-import de.geeksfactory.opacclient.objects.Starred;
+import de.geeksfactory.opacclient.objects.HistoryItem;
 import de.geeksfactory.opacclient.searchfields.SearchField;
 import de.geeksfactory.opacclient.searchfields.SearchField.Meaning;
 import de.geeksfactory.opacclient.searchfields.SearchQuery;
+import de.geeksfactory.opacclient.storage.HistoryDataSource;
+import de.geeksfactory.opacclient.storage.HistoryDatabase;
 import de.geeksfactory.opacclient.storage.JsonSearchFieldDataSource;
-import de.geeksfactory.opacclient.storage.StarDataSource;
-import de.geeksfactory.opacclient.storage.StarDatabase;
 import de.geeksfactory.opacclient.utils.CompatibilityUtils;
 
-public class StarredFragment extends Fragment implements
+public class HistoryFragment extends Fragment implements
         LoaderCallbacks<Cursor>, AccountSelectedListener {
 
     private static final String STATE_ACTIVATED_POSITION = "activated_position";
     private static final String JSON_LIBRARY_NAME = "library_name";
-    private static final String JSON_STARRED_LIST = "starred_list";
+    private static final String JSON_HISTORY_LIST = "history_list";
     private static final String JSON_ITEM_MNR = "item_mnr";
     private static final String JSON_ITEM_TITLE = "item_title";
     private static final String JSON_ITEM_MEDIATYPE = "item_mediatype";
@@ -99,7 +106,9 @@ public class StarredFragment extends Fragment implements
     private ListView listView;
     private int activatedPosition = ListView.INVALID_POSITION;
     private TextView tvWelcome;
-    private Starred sItem;
+    private HistoryItem historyItem;
+
+    private String sortOrder = null;
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
@@ -107,19 +116,19 @@ public class StarredFragment extends Fragment implements
 
         setHasOptionsMenu(true);
 
-        view = inflater.inflate(R.layout.fragment_starred, container, false);
+        view = inflater.inflate(R.layout.fragment_history, container, false);
         app = (OpacClient) getActivity().getApplication();
 
         adapter = new ItemListAdapter();
 
-        listView = (ListView) view.findViewById(R.id.lvStarred);
-        tvWelcome = (TextView) view.findViewById(R.id.tvWelcome);
+        listView = (ListView) view.findViewById(R.id.lvHistory);
+        tvWelcome = (TextView) view.findViewById(R.id.tvHistoryWelcome);
 
         listView.setOnItemClickListener(new OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> parent, View view,
                     int position, long id) {
-                Starred item = (Starred) view.findViewById(R.id.ivDelete)
+                HistoryItem item = (HistoryItem) view.findViewById(R.id.ivDelete)
                                              .getTag();
                 if (item.getMNr() == null || item.getMNr().equals("null")
                         || item.getMNr().equals("")) {
@@ -182,7 +191,7 @@ public class StarredFragment extends Fragment implements
     @Override
     public void onCreateOptionsMenu(android.view.Menu menu,
             MenuInflater inflater) {
-        inflater.inflate(R.menu.activity_starred, menu);
+        inflater.inflate(R.menu.activity_history, menu);
         super.onCreateOptionsMenu(menu, inflater);
     }
 
@@ -197,8 +206,46 @@ public class StarredFragment extends Fragment implements
         } else if (item.getItemId() == R.id.action_import_from_storage) {
             importFromStorage();
             return true;
+        } else if (item.getItemId() == R.id.action_sort_author) {
+            sort("author");
+            return true;
+        } else if (item.getItemId() == R.id.action_sort_firstDate) {
+            sort("firstDate");
+            return true;
+        } else if (item.getItemId() == R.id.action_sort_lastDate) {
+            sort("lastDate");
+            return true;
+        } else if (item.getItemId() == R.id.action_sort_prolongCount) {
+            sort("prolongCount");
+            return true;
+        } else if (item.getItemId() == R.id.action_sort_duration) {
+            sort("julianday(lastDate) - julianday(firstDate)");
+            return true;
         }
         return super.onOptionsItemSelected(item);
+    }
+
+    private void sort(String orderby) {
+
+        if (sortOrder == null) {
+            // bisher nicht sortiert
+            sortOrder = orderby + " ASC";
+        } else if (sortOrder.startsWith(orderby)) {
+            // bereits nach dieser Spalte sortiert
+            // d.h. ASC/DESC swappen
+            if (sortOrder.equals(orderby + " ASC")) {
+                sortOrder = orderby + " DESC";
+            } else {
+                sortOrder = orderby + " ASC";
+            }
+        } else {
+            // bisher nach anderer Spalte sortiert
+            // zunächst ASC
+            sortOrder = orderby + " ASC";
+        }
+
+        // Loader restarten
+        getActivity().getSupportLoaderManager().restartLoader(0, null, this);
     }
 
     @Override
@@ -206,9 +253,9 @@ public class StarredFragment extends Fragment implements
         getActivity().getSupportLoaderManager().restartLoader(0, null, this);
     }
 
-    public void remove(Starred item) {
-        StarDataSource data = new StarDataSource(getActivity());
-        sItem = item;
+    public void remove(HistoryItem item) {
+        HistoryDataSource data = new HistoryDataSource(getActivity());
+        historyItem = item;
         showSnackBar();
         data.remove(item);
     }
@@ -216,14 +263,14 @@ public class StarredFragment extends Fragment implements
     //Added code to show SnackBar when clicked on Remove button in Favorites screen
     private void showSnackBar() {
         Snackbar snackbar =
-                Snackbar.make(view, getString(R.string.starred_removed), Snackbar.LENGTH_LONG);
-        snackbar.setAction(R.string.starred_removed_undo, new View.OnClickListener() {
+                Snackbar.make(view, getString(R.string.history_removed), Snackbar.LENGTH_LONG);
+        snackbar.setAction(R.string.history_removed_undo, new OnClickListener() {
 
             @Override
             public void onClick(View view) {
-                StarDataSource data = new StarDataSource(getActivity());
-                String bib = app.getLibrary().getIdent();
-                data.star(sItem.getMNr(), sItem.getTitle(), bib, sItem.getMediaType());
+                HistoryDataSource data = new HistoryDataSource(getActivity());
+                // String bib = app.getLibrary().getIdent();
+                data.insertHistoryItem(historyItem);
             }
         });
         snackbar.show();
@@ -233,9 +280,9 @@ public class StarredFragment extends Fragment implements
     public Loader<Cursor> onCreateLoader(int arg0, Bundle arg1) {
         if (app.getLibrary() != null) {
             return new CursorLoader(getActivity(),
-                    app.getStarProviderStarUri(), StarDatabase.COLUMNS,
-                    StarDatabase.STAR_WHERE_LIB, new String[]{app
-                    .getLibrary().getIdent()}, null);
+                    app.getHistoryProviderHistoryUri(), HistoryDatabase.COLUMNS,
+                    HistoryDatabase.HIST_WHERE_LIB, new String[]{app
+                    .getLibrary().getIdent()}, sortOrder);
         } else {
             return null;
         }
@@ -257,15 +304,15 @@ public class StarredFragment extends Fragment implements
     }
 
     protected void share() {
-        Intent intent = new Intent(android.content.Intent.ACTION_SEND);
+        Intent intent = new Intent(Intent.ACTION_SEND);
         intent.setType("text/plain");
         intent.addFlags(CompatibilityUtils.getNewDocumentIntentFlag());
 
         StringBuilder text = new StringBuilder();
 
-        StarDataSource data = new StarDataSource(getActivity());
-        List<Starred> items = data.getAllItems(app.getLibrary().getIdent());
-        for (Starred item : items) {
+        HistoryDataSource data = new HistoryDataSource(getActivity());
+        List<HistoryItem> items = data.getAllItems(app.getLibrary().getIdent());
+        for (HistoryItem item : items) {
             text.append(item.getTitle());
             text.append("\n");
             String shareUrl;
@@ -296,15 +343,15 @@ public class StarredFragment extends Fragment implements
             // Create a file with the requested MIME type.
             intent.setType("application/json");
             intent.putExtra(Intent.EXTRA_TITLE,
-                    "webopac_starred_" + app.getLibrary().getIdent() + ".json");
+                    "webopac_history_" + app.getLibrary().getIdent() + ".json");
             startActivityForResult(intent, REQUEST_CODE_EXPORT);
         } else {        // <android 4.4; share json as text
             intent = new Intent();
             intent.setAction(Intent.ACTION_SEND);
             intent.setType("text/plain");
-            intent.putExtra(Intent.EXTRA_TEXT, getEncodedStarredObjects().toString());
+            intent.putExtra(Intent.EXTRA_TEXT, getEncodedHistoryItemObjects().toString());
             Intent chooser =
-                    Intent.createChooser(intent, getString(R.string.export_starred_to_storage));
+                    Intent.createChooser(intent, getString(R.string.export_history_to_storage));
             startActivity(chooser);
         }
     }
@@ -334,25 +381,25 @@ public class StarredFragment extends Fragment implements
                 Snackbar.LENGTH_SHORT).show();
     }
 
-    private JSONObject getEncodedStarredObjects() {
-        JSONObject starred = new JSONObject();
+    private JSONObject getEncodedHistoryItemObjects() {
+        JSONObject history = new JSONObject();
         try {
-            starred.put(JSON_LIBRARY_NAME, app.getLibrary().getIdent());
+            history.put(JSON_LIBRARY_NAME, app.getLibrary().getIdent());
             JSONArray items = new JSONArray();
-            StarDataSource data = new StarDataSource(getActivity());
-            List<Starred> libItems = data.getAllItems(app.getLibrary().getIdent());
-            for (Starred libItem : libItems) {
+            HistoryDataSource data = new HistoryDataSource(getActivity());
+            List<HistoryItem> libItems = data.getAllItems(app.getLibrary().getIdent());
+            for (HistoryItem libItem : libItems) {
                 JSONObject item = new JSONObject();
                 item.put(JSON_ITEM_MNR, libItem.getMNr());
                 item.put(JSON_ITEM_TITLE, libItem.getTitle());
                 item.put(JSON_ITEM_MEDIATYPE, libItem.getMediaType());
                 items.put(item);
             }
-            starred.put(JSON_STARRED_LIST, items);
+            history.put(JSON_HISTORY_LIST, items);
         } catch (JSONException e) {
             showExportError();
         }
-        return starred;
+        return history;
     }
 
     public void importFromStorage() {
@@ -377,14 +424,14 @@ public class StarredFragment extends Fragment implements
     @Override
     public void onActivityResult(int requestCode, int resultCode, Intent data) {
         if (requestCode == REQUEST_CODE_EXPORT && resultCode == Activity.RESULT_OK) {
-            Log.i("StarredFragment", data.toString());
+            Log.i("HistoryItemFragment", data.toString());
             Uri uri = data.getData();
             try {
                 OutputStream os = getActivity().getContentResolver().openOutputStream(uri);
                 if (os != null) {
-                    JSONObject starred = getEncodedStarredObjects();
+                    JSONObject history = getEncodedHistoryItemObjects();
                     PrintWriter pw = new PrintWriter(os, true);
-                    pw.write(starred.toString());
+                    pw.write(history.toString());
                     pw.close();
                     os.close();
                 } else {
@@ -399,7 +446,7 @@ public class StarredFragment extends Fragment implements
             Uri uri = data.getData();
             InputStream is = null;
             try {
-                StarDataSource dataSource = new StarDataSource(getActivity());
+                HistoryDataSource dataSource = new HistoryDataSource(getActivity());
                 is = getActivity().getContentResolver().openInputStream(uri);
                 if (is != null) {
                     BufferedReader reader = new BufferedReader(new InputStreamReader(is, "UTF-8"));
@@ -426,22 +473,24 @@ public class StarredFragment extends Fragment implements
                                 Snackbar.LENGTH_SHORT).show();
                         return;
                     }
-                    JSONArray items = savedList.getJSONArray(JSON_STARRED_LIST);
+                    JSONArray items = savedList.getJSONArray(JSON_HISTORY_LIST);
                     for (int i = 0; i < items.length(); i++) {
                         JSONObject entry = items.getJSONObject(i);
                         if (entry.has(JSON_ITEM_MNR) &&
-                                !dataSource.isStarred(bib, entry.getString(JSON_ITEM_MNR)) ||
-                                !entry.has(JSON_ITEM_MNR) && !dataSource.isStarredTitle(bib,
+                                !dataSource.isHistory(bib, entry.getString(JSON_ITEM_MNR)) ||
+                                !entry.has(JSON_ITEM_MNR) && !dataSource.isHistoryTitle(bib,
                                         entry.getString(JSON_ITEM_TITLE))) { //disallow dupes
                             String mediatype = entry.optString(JSON_ITEM_MEDIATYPE, null);
-                            dataSource.star(entry.optString(JSON_ITEM_MNR),
+                            /* TODO import
+                            dataSource.historize(entry.optString(JSON_ITEM_MNR),
                                     entry.getString(JSON_ITEM_TITLE), bib,
                                     mediatype != null ? SearchResult.MediaType.valueOf(mediatype) :
                                             null);
+                             */
                         }
                     }
                     adapter.notifyDataSetChanged();
-                    Snackbar.make(getView(), R.string.info_starred_updated,
+                    Snackbar.make(getView(), R.string.info_history_updated,
                             Snackbar.LENGTH_SHORT).show();
                 } else {
                     showImportError();
@@ -469,7 +518,7 @@ public class StarredFragment extends Fragment implements
             callback = (Callback) activity;
         } catch (ClassCastException e) {
             throw new ClassCastException(activity.toString()
-                    + " must implement StarredFragment.Callback");
+                    + " must implement HistoryFragment.Callback");
         }
     }
 
@@ -518,20 +567,80 @@ public class StarredFragment extends Fragment implements
     private class ItemListAdapter extends SimpleCursorAdapter {
 
         public ItemListAdapter() {
-            super(getActivity(), R.layout.listitem_starred, null,
+            super(getActivity(), R.layout.listitem_history_item, null,
                     new String[]{"bib"}, null, 0);
         }
 
         @Override
         public void bindView(View view, Context context, Cursor cursor) {
-            Starred item = StarDataSource.cursorToItem(cursor);
+            HistoryItem item = HistoryDataSource.cursorToItem(cursor);
 
-            TextView tv = (TextView) view.findViewById(R.id.tvTitle);
+            TextView tvTitleAndAuthor = (TextView) view.findViewById(R.id.tvTitleAndAuthor);
+
+            // von AccountAdapter:
+            // Overview (Title/Author, Status/Deadline, Branch)
+            SpannableStringBuilder builder = new SpannableStringBuilder();
             if (item.getTitle() != null) {
-                tv.setText(Html.fromHtml(item.getTitle()));
-            } else {
-                tv.setText("");
+                builder.append(item.getTitle());
+                builder.setSpan(new StyleSpan(Typeface.BOLD), 0, item.getTitle().length(), 0);
+                if (!TextUtils.isEmpty(item.getAuthor())) builder.append(". ");
             }
+            if (!TextUtils.isEmpty(item.getAuthor())) {
+                builder.append(item.getAuthor().split("¬\\[",2)[0]);
+            }
+            setTextOrHide(builder, tvTitleAndAuthor);
+            // statt von StarFragment
+            /*
+            if (item.getTitle() != null) {
+                tvTitleAndAuthor.setText(Html.fromHtml(item.getTitle()));
+            } else {
+                tvTitleAndAuthor.setText("");
+            }
+            */
+
+            TextView tvStatus = (TextView) view.findViewById(R.id.tvStatus);
+            TextView tvBranch = (TextView) view.findViewById(R.id.tvBranch);
+
+            DateTimeFormatter fmt = DateTimeFormat.shortDate();
+
+            builder = new SpannableStringBuilder();
+            if (item.getFirstDate() != null) {
+                int start = builder.length();
+                builder.append(fmt.print(item.getFirstDate()));
+                // setSpan with a span argument is not supported before API 21
+                /*
+                builder.setSpan(new ForegroundColorSpan(textColorPrimary),
+                        start, start + fmt.print(item.getDeadline()).length(), 0);
+                 */
+                if (item.getLastDate() != null) {
+                    builder.append(" – ");
+                    builder.append(fmt.print(item.getLastDate()));
+                }
+            }
+            setTextOrHide(builder, tvStatus);
+
+            if (item.getHomeBranch() != null) {
+                setTextOrHide(Html.fromHtml(item.getHomeBranch()), tvBranch);
+            }
+
+            tvBranch.getViewTreeObserver().addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener() {
+                @Override
+                public boolean onPreDraw () {
+                    tvBranch.getViewTreeObserver().removeOnPreDrawListener(this);
+                    // place tvBranch next to or below tvStatus to prevent overlapping
+                    RelativeLayout.LayoutParams lp = (RelativeLayout.LayoutParams)tvBranch.getLayoutParams();
+                    if (tvStatus.getPaint().measureText(tvStatus.getText().toString()) <
+                            tvStatus.getWidth() / 2 - 4){
+                        lp.addRule(RelativeLayout.BELOW, 0);  //removeRule only since API 17
+                        lp.addRule(RelativeLayout.ALIGN_PARENT_TOP);
+                    } else {
+                        lp.addRule(RelativeLayout.ALIGN_PARENT_TOP,0);
+                        lp.addRule(RelativeLayout.BELOW, R.id.tvStatus);
+                    }
+                    tvBranch.setLayoutParams(lp);
+                    return true;
+                }
+            });
 
             ImageView ivType = (ImageView) view.findViewById(R.id.ivMediaType);
             if (item.getMediaType() != null) {
@@ -541,17 +650,28 @@ public class StarredFragment extends Fragment implements
             }
 
             ImageView ivDelete = (ImageView) view.findViewById(R.id.ivDelete);
-            ivDelete.setFocusableInTouchMode(false);
-            ivDelete.setFocusable(false);
-            ivDelete.setTag(item);
-            ivDelete.setOnClickListener(new OnClickListener() {
-                @Override
-                public void onClick(View arg0) {
-                    Starred item = (Starred) arg0.getTag();
-                    remove(item);
-                    callback.removeFragment();
-                }
-            });
+            if (ivDelete != null) {
+                ivDelete.setFocusableInTouchMode(false);
+                ivDelete.setFocusable(false);
+                ivDelete.setTag(item);
+                ivDelete.setOnClickListener(new OnClickListener() {
+                    @Override
+                    public void onClick(View arg0) {
+                        HistoryItem item = (HistoryItem) arg0.getTag();
+                        remove(item);
+                        callback.removeFragment();
+                    }
+                });
+             }
+        }
+    }
+
+    protected static void setTextOrHide(CharSequence value, TextView tv) {
+        if (!TextUtils.isEmpty(value)) {
+            tv.setVisibility(View.VISIBLE);
+            tv.setText(value);
+        } else {
+            tv.setVisibility(View.GONE);
         }
     }
 
