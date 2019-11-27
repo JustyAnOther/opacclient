@@ -53,6 +53,7 @@ import android.widget.Toast;
 
 import com.google.android.material.snackbar.Snackbar;
 
+import org.joda.time.Days;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
 import org.json.JSONArray;
@@ -615,12 +616,22 @@ public class HistoryFragment extends Fragment implements
                 builder.setSpan(new ForegroundColorSpan(textColorPrimary),
                         start, start + fmt.print(item.getDeadline()).length(), 0);
                  */
+                int countDays = 0;
                 if (item.getLastDate() != null) {
                     builder.append(" – ");
                     builder.append(fmt.print(item.getLastDate()));
+                    Days daysBetween = Days.daysBetween(item.getFirstDate(), item.getLastDate());
+                    countDays = 1 + daysBetween.getDays();
                 }
+                String status = "?";
+                if (item.isLending()) {
+                    status = getString(R.string.history_status_lending, item.getFirstDate(), countDays);
+                } else {
+                    status = getString(R.string.history_status_finished, item.getFirstDate(), countDays);
+                }
+                setTextOrHide(status, tvStatus);
             }
-            setTextOrHide(builder, tvStatus);
+            // setTextOrHide(builder, tvStatus);
 
             if (item.getHomeBranch() != null) {
                 setTextOrHide(Html.fromHtml(item.getHomeBranch()), tvBranch);
