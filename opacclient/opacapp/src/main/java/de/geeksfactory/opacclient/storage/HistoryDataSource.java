@@ -27,6 +27,7 @@ import android.content.Context;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.text.BoringLayout;
+import android.util.Log;
 
 import org.joda.time.LocalDate;
 import org.json.JSONArray;
@@ -54,8 +55,7 @@ public class HistoryDataSource {
     private SQLiteDatabase database;
     private String[] allColumns = HistoryDatabase.COLUMNS;
 
-//    private Context context;
-//    public HistoryDataSource(Context context) {
+    public enum ChangeType { NOTHING, UPDATE, INSERT};
 
     private Activity context;
     public HistoryDataSource(Activity context) {
@@ -147,13 +147,80 @@ public class HistoryDataSource {
         return items;
     }
 
+    public ChangeType insertOrUpdate(String bib, JSONObject entry) throws  JSONException {
+
+        final String methodName = "insertOrUpdate";
+
+        // - same id/medianr or same (title, author and type)
+        // - and Zeitraum=(first bis last) überschneiden sich
+        LocalDate firstDate = LocalDate.parse(entry.getString(HistoryDatabase.HIST_COL_FIRST_DATE));
+        LocalDate lastDate  = LocalDate.parse(entry.getString(HistoryDatabase.HIST_COL_LAST_DATE));
+
+        Log.d(methodName, String.format("bib: %s, json: dates %s - %s", bib, firstDate, lastDate));
+
+        HistoryItem item = null;
+
+        if (entry.has(HistoryDatabase.HIST_COL_MEDIA_NR)) {
+            //
+            String id = entry.getString(HistoryDatabase.HIST_COL_MEDIA_NR);
+            Log.d(methodName, String.format("json: medianr %s", id));
+            item = isHistory(bib, id, firstDate, lastDate);
+        } else {
+            // title, type and author
+            String title = entry.getString(HistoryDatabase.HIST_COL_TITLE);
+            String author = entry.getString(HistoryDatabase.HIST_COL_AUTHOR);
+            String mediatype = entry.getString(HistoryDatabase.HIST_COL_MEDIA_TYPE);
+            Log.d(methodName, String.format("json: title %s, author %s, mediatype %s"
+                    ,title, author, mediatype));
+            item = isHistory(bib, title, author, mediatype , firstDate, lastDate);
+        }
+        Log.d(methodName, String.format("HistoryItem: %s", item));
+
+        ChangeType changeType = ChangeType.NOTHING;
+        if (item==null) {
+            // noch kein entsprechender Satz in Datenbank
+            Log.d(methodName, "call insertHistoryItem(...)");
+            insertHistoryItem(bib, entry);
+            changeType = ChangeType.INSERT;
+        } else {
+            // Satz vorhanden, ev. updaten
+
+            // firstDate, lastDate und count 'mergen'
+            if (firstDate.compareTo(item.getFirstDate())<0) {
+                Log.d(methodName, "firstDate changed");
+                changeType = ChangeType.UPDATE;
+                item.setFirstDate(firstDate);
+            }
+            if (lastDate.compareTo(item.getLastDate())>0) {
+                Log.d(methodName, "lastDate changed");
+                changeType = ChangeType.UPDATE;
+                item.setLastDate(lastDate);
+            }
+            int prolongCount = entry.getInt(HistoryDatabase.HIST_COL_PROLONG_COUNT);
+            if (prolongCount > item.getProlongCount()) {
+                Log.d(methodName, "prolongCount changed");
+                changeType = ChangeType.UPDATE;
+                item.setProlongCount(prolongCount);
+            }
+
+            if (changeType == ChangeType.UPDATE) {
+                Log.d(methodName, "call updateHistoryItem(...)");
+                updateHistoryItem(item);
+            } else {
+                Log.d(methodName, "nothing changed");
+            }
+        }
+
+        return changeType;
+    }
+
     private static JSONObject cursorToJson(String[] columns, Cursor cursor) throws
             JSONException {
         JSONObject jsonItem = new JSONObject();
         int i=0;
         for (String col : columns) {
             switch (col) {
-                case "lending":
+                case HistoryDatabase.HIST_COL_LENDING:
                 case "ebook":
                     // boolean wie int
                 case "prolongCount":
@@ -162,9 +229,9 @@ public class HistoryDataSource {
                     break;
                 case "historyId AS _id":
                     col = "historyId";
-                case "firstDate":
-                case "lastDate":
-                case "deadline":
+                case HistoryDatabase.HIST_COL_FIRST_DATE:
+                case HistoryDatabase.HIST_COL_LAST_DATE:
+                case HistoryDatabase.HIST_COL_DEADLINE:
                     // date wie String
                 default:
                     // String
@@ -221,9 +288,9 @@ public class HistoryDataSource {
     }
 
     private void addAccountItemValues(ContentValues values, AccountItem item ) {
-        putOrNull(values,"medianr", item.getId());
-        putOrNull(values,"title", item.getTitle());
-        putOrNull(values,"author", item.getAuthor());
+        putOrNull(values,HistoryDatabase.HIST_COL_MEDIA_NR, item.getId());
+        putOrNull(values,HistoryDatabase.HIST_COL_TITLE, item.getTitle());
+        putOrNull(values,HistoryDatabase.HIST_COL_AUTHOR, item.getAuthor());
         putOrNull(values,"format", item.getFormat());
         putOrNull(values,"status", item.getStatus());
         putOrNull(values,"cover", item.getCover());
@@ -235,15 +302,15 @@ public class HistoryDataSource {
         ContentValues values = new ContentValues();
         addAccountItemValues(values, historyItem);
 
-        putOrNull(values,"firstDate", historyItem.getFirstDate());
-        putOrNull(values,"lastDate", historyItem.getLastDate());
-        putOrNull(values,"lending", historyItem.isLending());
+        putOrNull(values,HistoryDatabase.HIST_COL_FIRST_DATE, historyItem.getFirstDate());
+        putOrNull(values,HistoryDatabase.HIST_COL_LAST_DATE, historyItem.getLastDate());
+        putOrNull(values,HistoryDatabase.HIST_COL_LENDING, historyItem.isLending());
         putOrNull(values,"bib", historyItem.getBib());
         putOrNull(values,"homeBranch", historyItem.getHomeBranch());
         putOrNull(values,"lendingBranch", historyItem.getLendingBranch());
         putOrNull(values,"ebook", historyItem.isEbook());
         putOrNull(values,"barcode", historyItem.getBarcode());
-        putOrNull(values,"deadline", historyItem.getDeadline());
+        putOrNull(values,HistoryDatabase.HIST_COL_DEADLINE, historyItem.getDeadline());
         values.put("prolongCount", historyItem.getProlongCount());
 
         return values;
@@ -254,22 +321,26 @@ public class HistoryDataSource {
         String where = "historyId = ?";
         context.getContentResolver()
                .update(((OpacClient) context.getApplication()).getHistoryProviderHistoryUri()
-                       , values, where, new String[]{Integer.toString(historyItem.getHistoryId())} );
+                       , values, where, new String[]{Integer.toString(historyItem.getHistoryId())
+                       } );
     }
 
     public void insertHistoryItem(HistoryItem historyItem ) {
         ContentValues values = createContentValues(historyItem);
         context.getContentResolver()
-               .insert(((OpacClient) context.getApplication()).getHistoryProviderHistoryUri(), values);
+               .insert(((OpacClient) context.getApplication()).getHistoryProviderHistoryUri(),
+               values);
     }
 
-    public void insertHistoryItem(JSONObject item ) throws JSONException {
+    public void insertHistoryItem(String bib, JSONObject item ) throws JSONException {
         ContentValues values = new ContentValues();
+        values.put("bib", bib);
+
         Iterator<String> keys = item.keys();
         while(keys.hasNext()) {
             String key = keys.next();
             switch (key) {
-                case "lending":
+                case HistoryDatabase.HIST_COL_LENDING:
                 case "ebook":
                     // boolean
                     boolean b = (1 == item.getInt(key));
@@ -284,13 +355,17 @@ public class HistoryDataSource {
                         values.putNull(key);
                     }
                     break;
+                case HistoryDatabase.HIST_COL_HISTORY_ID:
                 case "historyId AS _id":
+                    // egal was für eine historyId der Eintrag (in einer anderen HistoryDB)
+                    // hatte, hier wird die historyId neu vergeben (auch wg Duplicat Key)
+
                     // putOrNull(values,"historyId", item.getString(key) );
                     // key wird neu vergeben.
                     break;
-                case "firstDate":
-                case "lastDate":
-                case "deadline":
+                case HistoryDatabase.HIST_COL_FIRST_DATE:
+                case HistoryDatabase.HIST_COL_LAST_DATE:
+                case HistoryDatabase.HIST_COL_DEADLINE:
                     // date wird als String inserted
                 default:
                     // String
@@ -298,26 +373,28 @@ public class HistoryDataSource {
             }
         }
         context.getContentResolver()
-               .insert(((OpacClient) context.getApplication()).getHistoryProviderHistoryUri(), values);
+               .insert(((OpacClient) context.getApplication()).getHistoryProviderHistoryUri(),
+               values);
     }
 
     private void insertLentItem(String bib, LentItem lentItem ) {
         ContentValues values = new ContentValues();
         addAccountItemValues(values, lentItem);
 
-        putOrNull(values, "firstDate", LocalDate.now());
-        putOrNull(values, "lastDate", LocalDate.now());
-        putOrNull(values, "lending", true);
+        putOrNull(values, HistoryDatabase.HIST_COL_FIRST_DATE, LocalDate.now());
+        putOrNull(values, HistoryDatabase.HIST_COL_LAST_DATE, LocalDate.now());
+        putOrNull(values, HistoryDatabase.HIST_COL_LENDING, true);
 
         putOrNull(values, "bib", bib);
         putOrNull(values, "homeBranch", lentItem.getHomeBranch());
         putOrNull(values, "lendingBranch", lentItem.getLendingBranch());
         putOrNull(values, "ebook", lentItem.isEbook());
         putOrNull(values, "barcode", lentItem.getBarcode());
-        putOrNull(values, "deadline", lentItem.getDeadline());
+        putOrNull(values, HistoryDatabase.HIST_COL_DEADLINE, lentItem.getDeadline());
 
         context.getContentResolver()
-               .insert(((OpacClient) context.getApplication()).getHistoryProviderHistoryUri(), values);
+               .insert(((OpacClient) context.getApplication()).getHistoryProviderHistoryUri(),
+               values);
     }
 
     private void putOrNull(ContentValues cv, String key, String value) {
@@ -416,7 +493,7 @@ public class HistoryDataSource {
                 .getContentResolver()
                 .query(((OpacClient) context.getApplication())
                                 .getHistoryProviderHistoryUri(),
-                        HistoryDatabase.COLUMNS, HistoryDatabase.HIST_WHERE_NR_LIB,
+                        HistoryDatabase.COLUMNS, HistoryDatabase.HIST_WHERE_LIB_NR,
                         selA, null);
         HistoryItem item = null;
 
@@ -450,20 +527,59 @@ public class HistoryDataSource {
         return item;
     }
 
-    public boolean isHistory(String bib, String id) {
+    public HistoryItem isHistory(String bib, String id, LocalDate firstDate, LocalDate lastDate) {
         if (id == null) {
-            return false;
+            return null;
         }
+
         String[] selA = {bib, id};
         Cursor cursor = context
                 .getContentResolver()
                 .query(((OpacClient) context.getApplication())
                                 .getHistoryProviderHistoryUri(),
-                        HistoryDatabase.COLUMNS, HistoryDatabase.HIST_WHERE_NR_LIB,
+                        HistoryDatabase.COLUMNS, HistoryDatabase.HIST_WHERE_LIB_NR,
                         selA, null);
-        int c = cursor.getCount();
+        cursor.moveToFirst();
+        HistoryItem item = foo(cursor, firstDate, lastDate);
         cursor.close();
-        return (c > 0);
+
+        return item;
+    }
+
+    public HistoryItem isHistory(String bib, String title, String author, String mediatype
+            , LocalDate firstDate, LocalDate lastDate) {
+
+        String[] selA = {bib, title, author, mediatype};
+        Cursor cursor = context
+                .getContentResolver()
+                .query(((OpacClient) context.getApplication())
+                                .getHistoryProviderHistoryUri(),
+                        HistoryDatabase.COLUMNS, HistoryDatabase.HIST_WHERE_LIB_TITLE_AUTHOR_TYPE,
+                        selA, null);
+        cursor.moveToFirst();
+        HistoryItem item = foo(cursor, firstDate, lastDate);
+        cursor.close();
+        return item;
+    }
+
+    private HistoryItem foo(Cursor cursor, LocalDate firstDate, LocalDate lastDate) {
+        while (!cursor.isAfterLast()) {
+            HistoryItem item = cursorToItem(cursor);
+
+            if (firstDate.compareTo(item.getLastDate())>0) {
+                // firstDate > item.lastDate: Zeitraum überschneidet sich nicht
+            } else if (item.getFirstDate().compareTo(lastDate)>0) {
+                // item.firstDate > lastDate: Zeitraum überschneidet sich nicht
+                item = null;
+            } else {
+                // Zeitraum überschneidet sich
+                return item;
+            }
+
+            cursor.moveToNext();
+        }
+
+        return null;
     }
 
     public boolean isHistoryTitle(String bib, String title) {
