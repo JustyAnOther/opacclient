@@ -1650,6 +1650,21 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
 
         // Leading/Trailing Spaces entfernen
         // title = title.trim();
+        setTitleAndType(item, title);
+
+        // Autor
+        if (split.length > 1) {
+            item.setAuthor(
+                    split[1].replaceFirst("([^:;\n]+)[:;\n](.*)$", "$1").trim());
+        }
+
+        // id is always the last one...
+        String id = split[split.length - 1];
+        item.setId(id);
+    }
+
+    private static void setTitleAndType(AccountItem item, String title) {
+        final char SPACE = (char) 32; // " ".charAt(0);
 
         // Prefix MediaType "[...] ..." entfernen, z.B. "[DVD-Video] ..." am Anfang
         if (title.startsWith("[")) {
@@ -1696,16 +1711,6 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
         }
 
         item.setTitle(title);
-
-        // Autor
-        if (split.length > 1) {
-            item.setAuthor(
-                    split[1].replaceFirst("([^:;\n]+)[:;\n](.*)$", "$1").trim());
-        }
-
-        // id is always the last one...
-        String id = split[split.length - 1];
-        item.setId(id);
     }
 
     protected Document handleLoginForm(Document doc, Account account)
