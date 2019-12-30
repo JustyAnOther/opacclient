@@ -30,7 +30,8 @@ public class AdisAccountTest extends BaseHtmlTest {
     }
 
     private static final String[] FILES =
-            new String[]{"tuebingen.html", "stuttgart.html", "stuttgart2.html", "stuttgart3.html", "muenchen.html"};
+//            new String[]{"tuebingen.html", "stuttgart.html", "stuttgart2.html", "stuttgart3.html", "muenchen.html"};
+            new String[]{"stuttgart4.html"};
 
     @Parameterized.Parameters(name = "{0}")
     public static Collection<String[]> files() {
