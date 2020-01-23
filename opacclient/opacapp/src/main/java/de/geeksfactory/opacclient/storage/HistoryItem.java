@@ -1,8 +1,11 @@
-package de.geeksfactory.opacclient.objects;
+package de.geeksfactory.opacclient.storage;
 
 import org.joda.time.LocalDate;
 
 import java.io.Serializable;
+
+import de.geeksfactory.opacclient.objects.AccountItem;
+import de.geeksfactory.opacclient.objects.LentItem;
 
 public class HistoryItem extends AccountItem implements Serializable {
 
@@ -29,7 +32,10 @@ public class HistoryItem extends AccountItem implements Serializable {
         return prolongCount;
     }
 
-    public LocalDate getDeadline() { return deadline; }
+    public LocalDate getDeadline() {
+        return deadline;
+    }
+
     public void setDeadline(LocalDate deadline) {
         this.deadline = deadline;
     }
@@ -150,6 +156,7 @@ public class HistoryItem extends AccountItem implements Serializable {
     public String getBib() {
         return bib;
     }
+
     public void setBib(String bib) {
         this.bib = bib;
     }
@@ -157,19 +164,25 @@ public class HistoryItem extends AccountItem implements Serializable {
     public int getHistoryId() {
         return historyId;
     }
+
     public void setHistoryId(int historyId) {
         this.historyId = historyId;
     }
 
-    // MNr wie bei Starred
-    public String getMNr() {
-        return super.getId();
-    }
-    public void setMNr(String mnr) {
-        super.setId(mnr);
-    }
-
     public boolean isSameAsLentItem(LentItem lentItem) {
+
+        // Id/MediaNr
+        if (getId() == null) {
+            if (lentItem.getId() != null) {
+                return false;
+            }
+        } else {
+            if (!getId().equals(lentItem.getId())) {
+                return false;
+            }
+            // Id/MediaNr are equal
+            // return true; ??
+        }
 
         if (getMediaType() == null) {
             if (lentItem.getMediaType() != null) {
