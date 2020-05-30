@@ -85,6 +85,7 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
         types.put("Munzinger", MediaType.EBOOK);
         types.put("E-Audio", MediaType.EAUDIO);
         types.put("Blu-Ray", MediaType.BLURAY);
+        types.put("Blu-ray Disc", MediaType.BLURAY);
     }
 
     protected String opac_url = "";
