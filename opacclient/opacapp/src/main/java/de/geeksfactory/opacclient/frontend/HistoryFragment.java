@@ -81,6 +81,7 @@ import de.geeksfactory.opacclient.R;
 import de.geeksfactory.opacclient.frontend.OpacActivity.AccountSelectedListener;
 import de.geeksfactory.opacclient.objects.Account;
 import de.geeksfactory.opacclient.objects.AccountItem;
+import de.geeksfactory.opacclient.objects.SearchResult;
 import de.geeksfactory.opacclient.searchfields.SearchField;
 import de.geeksfactory.opacclient.searchfields.SearchField.Meaning;
 import de.geeksfactory.opacclient.searchfields.SearchQuery;
@@ -825,7 +826,7 @@ public class HistoryFragment extends Fragment implements
     }
 
     public interface Callback {
-        public void showDetail(String mNr);
+        public void showDetail(String mNr, SearchResult.MediaType mediaType);
 
         public void removeFragment();
     }
