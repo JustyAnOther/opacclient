@@ -24,13 +24,18 @@ package de.geeksfactory.opacclient.storage;
 import android.app.Activity;
 import android.content.ContentValues;
 import android.database.Cursor;
+import android.net.Uri;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 
 import de.geeksfactory.opacclient.OpacClient;
+import de.geeksfactory.opacclient.objects.Copy;
+import de.geeksfactory.opacclient.objects.Detail;
 import de.geeksfactory.opacclient.objects.SearchResult;
 
 public class StarDataSource {
@@ -57,14 +62,53 @@ public class StarDataSource {
         return item;
     }
 
-    public void star(String nr, String title, String bib, SearchResult.MediaType mediaType) {
+    public long star(String nr, String title, String bib, SearchResult.MediaType mediaType, List<Copy> copies) {
+
+        // each branch only once
+        Set<String> branches = new HashSet<>();
+        if ((copies != null) && (!copies.isEmpty())) {
+            for (Copy copy : copies) {
+                String branch = copy.getBranch();
+                if (branch == null) {
+                    continue;
+                }
+                if (!branches.contains(branch))
+                {
+                    branches.add(branch);
+                }
+            }
+        }
+
+        // branch: name --> id
+        List<Long> branchIds = new ArrayList<>();
+        for (String branch: branches ) {
+            long id = getBranchId(bib, branch);
+            if (id == 0) {
+                id = insertBranch(bib, branch);
+            }
+            branchIds.add(Long.valueOf(id));
+        }
+
+        // star
+        long starId = star(nr, title, bib, mediaType);
+
+        // relationship star / branch
+        for (Long branchId: branchIds ) {
+            insertStarBranch(starId, branchId);
+        }
+
+        return starId;
+    }
+
+    public long star(String nr, String title, String bib, SearchResult.MediaType mediaType) {
         ContentValues values = new ContentValues();
         values.put("medianr", nr);
         values.put("title", title);
         values.put("bib", bib);
         values.put("mediatype", mediaType != null ? mediaType.toString() : null);
-        context.getContentResolver()
+        Uri uri = context.getContentResolver()
                .insert(((OpacClient) context.getApplication()).getStarProviderStarUri(), values);
+        return getId(uri);
     }
 
     public List<Starred> getAllItems(String bib) {
@@ -200,4 +244,121 @@ public class StarDataSource {
                            new String[]{entry.getKey()});
         }
     }
+
+    /**
+     * setzt Column Filtertimestamp zur branchId
+     * @param id branchId
+     * @param time
+     */
+    public void updateBranchFiltertimestamp(int id, long time) {
+        ContentValues cv = new ContentValues();
+        cv.put("filtertimestamp", time);
+        context.getContentResolver()
+               .update(StarContentProvider.BRANCH_URI,
+                       cv, StarDatabase.BRANCH_WHERE_ID,
+                       new String[]{Integer.toString(id)});
+    }
+
+    /**
+     * ermittelt alle Branches (Namen) zu einer starId
+     * @param starId
+     * @return
+     */
+    public List<String> getBranches(int starId) {
+        String[] proj = {"branch, count(*) as count"};
+        String[] selA = { Integer.toString(starId)};
+        Cursor cursor = context
+                .getContentResolver()
+                .query(StarContentProvider.STAR_BRANCH_JOIN_BRANCH_URI, proj,
+                        "id_star = ?", selA, null);
+
+        List<String> list = new ArrayList<String>();
+        cursor.moveToFirst();
+        while (!cursor.isAfterLast()) {
+            list.add(cursor.getString(0));
+            cursor.moveToNext();
+        }
+        // Make sure to close the cursor
+        cursor.close();
+
+        return list;
+    }
+
+
+    private int getBranchId(String bib, String branch) {
+        if (branch == null) {
+            return 0;
+        }
+        String[] selC = {"id"};
+        String[] selA = {bib, branch};
+        Cursor cursor = context
+                .getContentResolver()
+                .query(StarContentProvider.BRANCH_URI,
+                        selC,
+                        StarDatabase.BRANCH_WHERE_LIB_BRANCH, selA, null);
+
+        int id = 0;
+        cursor.moveToFirst();
+        if (!cursor.isAfterLast()) {
+            id = cursor.getInt(0);
+        }
+        // Make sure to close the cursor
+        cursor.close();
+
+        return id;
+    }
+
+    public List<Branch> getStarredBranches(String bib) {
+        String[] proj = {"id, branch, filtertimestamp, count(*) as count"};
+        String[] selA = {bib};
+        Cursor cursor = context
+                .getContentResolver()
+                .query(StarContentProvider.STAR_BRANCH_JOIN_BRANCH_URI, proj,
+                        "bib = ?", selA, "filtertimestamp DESC");
+
+        List<Branch> list = new ArrayList<Branch>();
+        cursor.moveToFirst();
+        while (!cursor.isAfterLast()) {
+            Branch item = cursorToBranch(cursor);
+            if (item.getCount()>0) {
+                list.add(item);
+            }
+            cursor.moveToNext();
+        }
+        // Make sure to close the cursor
+        cursor.close();
+
+        return list;
+    }
+
+    private static Branch cursorToBranch(Cursor cursor) {
+        Branch item = new Branch();
+        item.setId(cursor.getInt(0));
+        item.setBranch(cursor.getString(1));
+        item.setFiltertimestamp(cursor.getInt(2));
+        item.setCount(cursor.getInt(3));
+        return item;
+    }
+
+    private long insertBranch(String bib, String branch) {
+        ContentValues values = new ContentValues();
+        values.put("bib", bib);
+        values.put("branch", branch);
+        Uri uri = context.getContentResolver().insert(StarContentProvider.BRANCH_URI, values);
+        return getId(uri);
+    }
+
+    private long insertStarBranch(long starId, long branchId) {
+        ContentValues values = new ContentValues();
+        values.put("id_star", starId);
+        values.put("id_branch", branchId);
+        Uri uri = context.getContentResolver().insert(StarContentProvider.STAR_BRANCH_URI, values);
+        return getId(uri);
+    }
+
+    private long getId(Uri uri) {
+        long id = Long.parseLong(uri.getLastPathSegment());
+        return id;
+    }
+
 }
