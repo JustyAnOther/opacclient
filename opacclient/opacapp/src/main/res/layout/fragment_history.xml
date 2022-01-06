@@ -16,16 +16,28 @@
         android:textAppearance="?android:attr/textAppearanceMedium"
         android:visibility="gone"/>
 
-    <TextView
-        android:id="@+id/tvHistoryHeader"
+    <RelativeLayout
+        android:id="@+id/rlHistoryHeader"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="10dp"
-        android:layout_marginTop="16dp"
-        android:layout_marginLeft="16dp"
-        android:layout_marginRight="16dp"
-        android:text="@string/history_header"
-        android:textAppearance="@style/TextAppearance.Opacapp.Subhead"/>
+        android:layout_alignParentLeft="false"
+        android:layout_alignParentTop="true"
+        android:background="@color/account_head_bg"
+        android:orientation="vertical"
+        android:padding="8dp"
+        android:transitionName="@string/transition_gray_box"
+        >
+
+        <TextView
+            android:id="@+id/tvHistoryHeader"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="@color/account_head_fg"
+            android:background="@color/account_head_bg"
+            android:text="@string/history_header"
+            android:textAppearance="@style/TextAppearance.Opacapp.Subhead"
+            />
+    </RelativeLayout>
 
     <ListView
         android:id="@+id/lvHistory"
