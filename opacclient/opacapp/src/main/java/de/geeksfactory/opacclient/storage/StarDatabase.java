@@ -34,12 +34,12 @@ public class StarDatabase extends SQLiteOpenHelper {
             + " bib text," + " title text," + " mediatype text"
             + " );";
 
-    /* table for branches, which are used by starred-media-itmes */
+    /* table for branches, which are used by starred-media-items */
     public static final String BRANCH_TABLE = "branch";
     private static final String BRANCH_TABLE_CREATE = "create table " + BRANCH_TABLE
             + " ( id integer primary key autoincrement,"
             + " bib text,"
-            + " branch text,"
+            + " name text,"
             + " filtertimestamp integer"
             + " );";
 
@@ -47,7 +47,10 @@ public class StarDatabase extends SQLiteOpenHelper {
     public static final String STAR_BRANCH_TABLE = "starred_branch";
     private static final String STAR_BRANCH_TABLE_CREATE = "create table " + STAR_BRANCH_TABLE
             + " ( id_star integer,"
-            + "  id_branch integer,"
+            + " id_branch integer,"
+            + " status text,"
+            + " statusTime integer,"
+            + " returnDate integer,"
             + " PRIMARY KEY (id_star, id_branch),"
             + "  FOREIGN KEY ( id_star ) REFERENCES " + STAR_TABLE + "( id ) ON DELETE CASCADE,"
             + "  FOREIGN KEY ( id_branch ) REFERENCES " + BRANCH_TABLE + "( id ) ON DELETE CASCADE"
@@ -56,13 +59,15 @@ public class StarDatabase extends SQLiteOpenHelper {
     // CHANGE THIS
     public static final String STAR_WHERE_ID = "id = ?";
     public static final String STAR_WHERE_LIB = "bib = ?";
+    public static final String STAR_WHERE_LIB_ID = "bib = ? and id = ?";
     public static final String STAR_WHERE_LIB_BRANCH = "bib = ? and id_branch = ?";
+    public static final String STAR_WHERE_LIB_BRANCH_IS_NULL = "bib = ? and id_branch is null";
     public static final String STAR_WHERE_TITLE_LIB = "bib = ? AND medianr IS NULL AND title = ?";
     public static final String STAR_WHERE_NR_LIB = "bib = ? AND medianr = ?";
     public static final String[] COLUMNS = {"id AS _id", "medianr", "bib",
             "title", "mediatype"};
 
-    public static final String BRANCH_WHERE_LIB_BRANCH = "bib = ? and branch = ?";
+    public static final String BRANCH_WHERE_LIB_NAME = "bib = ? and name = ?";
     public static final String BRANCH_WHERE_ID = "id = ?";
 
     private static final String DATABASE_NAME = "starred.db";

@@ -360,7 +360,7 @@
     <string name="please_enter_username">Please enter your membership ID.</string>
     <string name="intro_title_0">Welcome to Web Opac App!</string>
     <string name="intro_description_0">Swipe left for more information.</string>
-    <string name="intro_title_1">Notifications</string>
+    <string name="intro_title_1" translatable="false">Notifications</string>
     <string name="intro_description_1">You can enable notifications in the app settings to receive a reminder when your lent books are due.</string>
     <string name="intro_title_2">1000+ libraries</string>
     <string name="intro_description_2">This app supports more than 1,000 libraries from all around the world. Select yours or suggest it if it\'s not yet on the list!</string>
@@ -372,4 +372,28 @@
     <string name="support_policy_hint">We provide no free support for use of this library in the
         app, problems that may occur in the future will probably not be fixed.</string>
     <string name="support_policy_more_info">more info</string>
+    <string name="starred_refresh_branches">Refresh status</string>
+    <string name="starred_filter_no_branch">Without Branch</string>
+    <string name="starred_header_branch">%1$d items in %2$s</string>
+    <string name="starred_header">%1d items</string>
+    <string name="starred_remove_all">Remove all</string>
+    <string name="starred_remove_all_sure">Remove all?</string>
+    <string name="starred_remove_all_ok">Yes</string>
+    <string name="starred_update_branch_success">Update branches for %1$d items</string>
+    <string name="starred_update_branch_fail">Update branches failed %1$s</string>
+    <string name="starred_filter_all">All</string>
+    <string name="starred_without_branch">%1d item without brach</string>
+    <string name="starred_up_to_date">The status is up-to-date.</string>
+    <plurals name="starred_age_minutes">
+        <item quantity="one">The status is one minute old.</item>
+        <item quantity="other">The is status is %d minutes old.</item>
+    </plurals>
+    <plurals name="starred_age_hours">
+        <item quantity="one">The status is one hour old.</item>
+        <item quantity="other">The status is %d hours old.</item>
+    </plurals>
+    <plurals name="starred_age_days">
+        <item quantity="one">The status is one day old.</item>
+        <item quantity="other">The status is %d days old.</item>
+    </plurals>
 </resources>
