@@ -374,6 +374,7 @@
     <string name="support_policy_more_info">more info</string>
     <string name="starred_refresh_branches">Refresh status</string>
     <string name="starred_filter_no_branch">Without Branch</string>
+    <string name="starred_filter_no_branch_count">Without Branch (%1$d)</string>
     <string name="starred_header_branch">%1$d items in %2$s</string>
     <string name="starred_header">%1d items</string>
     <string name="starred_remove_all">Remove all</string>

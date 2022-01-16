@@ -71,6 +71,7 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.cursoradapter.widget.SimpleCursorAdapter;
 import androidx.fragment.app.Fragment;
@@ -102,10 +103,11 @@ import de.geeksfactory.opacclient.utils.CompatibilityUtils;
 public class StarredFragment extends Fragment implements
         LoaderCallbacks<Cursor>, AccountSelectedListener {
 
-    private static Logger LOGGER = new Logger(StarredFragment.class);
+    private static final Logger LOGGER = new Logger(StarredFragment.class);
 
     public static final String STATE_ACTIVATED_POSITION = "activated_position";
     public static final String STATE_FILTER_BRANCH = "filter_branch";
+    public static final String STATE_FILTER_BIB = "filter_bib";
 
     private static final String JSON_LIBRARY_NAME = "library_name";
     private static final String JSON_STARRED_LIST = "starred_list";
@@ -134,7 +136,7 @@ public class StarredFragment extends Fragment implements
     private static class Logger {
         private String tag;
 
-        public Logger(Class clazz) {
+        public Logger(@NonNull Class<?> clazz) {
             tag = clazz.getSimpleName();
             if (tag.length()>23) {
                 tag = tag.substring(0, 23);
@@ -154,7 +156,6 @@ public class StarredFragment extends Fragment implements
         LOGGER.d(format, args);
     }
 
-
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
             Bundle savedInstanceState) {
@@ -166,13 +167,13 @@ public class StarredFragment extends Fragment implements
 
         adapter = new ItemListAdapter();
 
-        listView = (ListView) view.findViewById(R.id.lvStarred);
-        tvWelcome = (TextView) view.findViewById(R.id.tvWelcome);
-        tvHeader = (TextView) view.findViewById(R.id.tvStarredHeader);
-        progressBar = (ProgressBar) view.findViewById(R.id.progressBar);
+        listView = view.findViewById(R.id.lvStarred);
+        tvWelcome = view.findViewById(R.id.tvWelcome);
+        tvHeader = view.findViewById(R.id.tvStarredHeader);
+        progressBar = view.findViewById(R.id.progressBar);
         progressBar.setVisibility(View.GONE);
 
-        swipeRefreshLayout = (SwipeRefreshLayout) view.findViewById(R.id.swipeStarred);
+        swipeRefreshLayout = view.findViewById(R.id.swipeStarred);
         swipeRefreshLayout.setColorSchemeResources(R.color.primary_red);
         swipeRefreshLayout.setOnRefreshListener(new SwipeRefreshLayout.OnRefreshListener() {
             @Override
@@ -190,40 +191,11 @@ public class StarredFragment extends Fragment implements
                                              .getTag();
                 if (item.getMNr() == null || item.getMNr().equals("null")
                         || item.getMNr().equals("")) {
-
-                    SharedPreferences sp = PreferenceManager
-                            .getDefaultSharedPreferences(getActivity());
-                    List<SearchQuery> query = new ArrayList<>();
-                    List<SearchField> fields = new JsonSearchFieldDataSource(
-                            app).getSearchFields(app.getLibrary().getIdent());
-                    if (fields != null) {
-                        SearchField title_field = null, free_field = null;
-                        for (SearchField field : fields) {
-                            if (field.getMeaning() == Meaning.TITLE) {
-                                title_field = field;
-                            } else if (field.getMeaning() == Meaning.FREE) {
-                                free_field = field;
-                            } else if (field.getMeaning() == Meaning.HOME_BRANCH) {
-                                query.add(new SearchQuery(field, sp.getString(
-                                        OpacClient.PREF_HOME_BRANCH_PREFIX
-                                                + app.getAccount().getId(),
-                                        null)));
-                            }
-                        }
-                        if (title_field != null) {
-                            query.add(new SearchQuery(title_field, item
-                                    .getTitle()));
-                        } else if (free_field != null) {
-                            query.add(new SearchQuery(free_field, item
-                                    .getTitle()));
-                        }
-                        app.startSearch(getActivity(), query);
-                    } else {
-                        Toast.makeText(getActivity(), R.string.no_search_cache,
-                                Toast.LENGTH_LONG).show();
-                    }
+                    // keine eindeutige Id, via search
+                    startSearch(item);
                 } else {
-                    getActivity().invalidateOptionsMenu();
+                    // warum ?
+                    // getActivity().invalidateOptionsMenu();
                     callback.showDetail(item.getMNr(), item.getMediaType());
                 }
             }
@@ -235,8 +207,24 @@ public class StarredFragment extends Fragment implements
                      .initLoader(LOADER_ID, null, this);
         listView.setAdapter(adapter);
 
+        restoreState(savedInstanceState);
+
+        setActivateOnItemClick(((OpacActivity) getActivity()).isTablet());
+
+        return view;
+    }
+
+    private void restoreState(Bundle savedInstanceState) {
         SharedPreferences sp = PreferenceManager
                 .getDefaultSharedPreferences(getContext());
+
+        String bib = app.getLibrary().getIdent();
+        String savedBib = sp.getString(STATE_FILTER_BIB, null);
+        if (!bib.equals(savedBib)) {
+            // Status gehört zu einer anderen Bibliothek,
+            // daher nichts restoren. Fertig!
+            return;
+        }
 
         currentFilterBranchId = sp.getInt(STATE_FILTER_BRANCH, FILTER_BRANCH_ALL);
         if (sp.contains(STATE_ACTIVATED_POSITION)) {
@@ -255,10 +243,55 @@ public class StarredFragment extends Fragment implements
                 currentFilterBranchId = savedInstanceState.getInt(STATE_FILTER_BRANCH);
             }
         }
+    }
 
-        setActivateOnItemClick(((OpacActivity) getActivity()).isTablet());
+    private void startSearch(Starred item) {
 
-        return view;
+        SharedPreferences sp = PreferenceManager
+                .getDefaultSharedPreferences(getActivity());
+
+        List<SearchField> fields = new JsonSearchFieldDataSource(
+                app).getSearchFields(app.getLibrary().getIdent());
+
+        if (fields == null) {
+            Toast.makeText(getActivity(), R.string.no_search_cache,
+                    Toast.LENGTH_LONG).show();
+            return;
+        }
+
+        List<SearchQuery> query = new ArrayList<>();
+
+        SearchField title_field = null, free_field = null, category_field = null;
+        for (SearchField field : fields) {
+            if (field.getMeaning() == Meaning.TITLE) {
+                title_field = field;
+            } else if (field.getMeaning() == Meaning.FREE) {
+                free_field = field;
+//            } else if (field.getMeaning() == Meaning.CATEGORY) {
+//                category_field = field;
+            } else if (field.getMeaning() == Meaning.HOME_BRANCH) {
+                query.add(new SearchQuery(field, sp.getString(
+                        OpacClient.PREF_HOME_BRANCH_PREFIX
+                                + app.getAccount().getId(),
+                        null)));
+            }
+        }
+        if (title_field != null) {
+            query.add(new SearchQuery(title_field, item
+                    .getTitle()));
+        } else if (free_field != null) {
+            query.add(new SearchQuery(free_field, item
+                    .getTitle()));
+        }
+        /*
+        if (category_field != null) {
+            // Leider nicht so einfach
+            // category ist ein Drop-Down;
+            // Text-MediaType-Zuordnung in Adis protected Hashmap types und mehrdeutig
+            query.add(new SearchQuery(category_field, item
+                    .getMediaType().toString()));
+        }*/
+        app.startSearch(getActivity(), query);
     }
 
     @Override
@@ -273,8 +306,22 @@ public class StarredFragment extends Fragment implements
         } else {
             addSubMenuBranchesFromSearchField(menu);
         }
+        enableRefreshBranches(menu);
 
         super.onCreateOptionsMenu(menu, inflater);
+    }
+
+    private void enableRefreshBranches(android.view.Menu menu) {
+        StarDataSource data = new StarDataSource(getActivity());
+        String bib = app.getLibrary().getIdent();
+
+        int countItemWithValidMnr = data.getCountItemWithValidMnr(bib);
+
+        // MenuItem verstecken
+        MenuItem item = menu.findItem(R.id.action_refresh_branches);
+        item.setVisible(countItemWithValidMnr > 0);
+        // No SwipeRefresh
+        swipeRefreshLayout.setEnabled(countItemWithValidMnr > 0);
     }
 
     private void addSubMenuBranchesFromDb(android.view.Menu menu) {
@@ -291,12 +338,21 @@ public class StarredFragment extends Fragment implements
                 , branches.size(), countStarredWithoutBranch);
 
         if (((null == branches) || branches.isEmpty()) && (countStarredWithoutBranch == 0)){
-            itemFilter.setVisible(false);
+            // auch wenn noch keine Branches zugeordnet sind Filter anzeigen?
+            // Ja, damit auf "Ohne Branch selektiert werden kann und
+            // diese Auswahl dann refresh werden kann
+            itemFilter.setVisible(true);
             return;
         }
 
         MenuItem itemFilterNoBranch = menu.findItem(R.id.action_filter_no_branch);
-        itemFilterNoBranch.setVisible(countStarredWithoutBranch > 0);
+        if (countStarredWithoutBranch > 0) {
+            String text = getString(R.string.starred_filter_no_branch_count, countStarredWithoutBranch);
+            itemFilterNoBranch.setTitle(text);
+            itemFilterNoBranch.setVisible(true);
+        } else {
+            itemFilterNoBranch.setVisible(false);
+        }
 
         final int groupId = Menu.NONE;
         for (Branch branch : branches) {
@@ -360,7 +416,7 @@ public class StarredFragment extends Fragment implements
             return true;
         } else if (item.getItemId() == R.id.action_import_from_storage) {
             importFromStorage();
-            getActivity().invalidateOptionsMenu();
+            refreshViewAfterChange();
             return true;
         } else if (item.getItemId() == R.id.action_refresh_branches) {
             swipeRefreshLayout.setRefreshing(true);
@@ -374,18 +430,19 @@ public class StarredFragment extends Fragment implements
             } else {
                 removeAllWithSnackbar();
             }
+            refreshViewAfterChange();
             return true;
         } else if (item.getItemId() == R.id.action_filter_no_branch) {
             currentFilterBranchId = FILTER_BRANCH_NONE;
-            item.setChecked(!item.isChecked());
-            getActivity().getSupportLoaderManager().restartLoader(LOADER_ID, null, this);
+            refreshViewAfterChange();
             return true;
+
         } else if (item.getItemId() == R.id.action_filter_all) {
             // clear selection
             currentFilterBranchId = FILTER_BRANCH_ALL;
-            getActivity().invalidateOptionsMenu();
-            getActivity().getSupportLoaderManager().restartLoader(LOADER_ID, null, this);
+            refreshViewAfterChange();
             return true;
+
         } else {
             // Hier FilterSubMenu
             if (item.getItemId() == currentFilterBranchId) {
@@ -398,8 +455,7 @@ public class StarredFragment extends Fragment implements
                 StarDataSource data = new StarDataSource(getActivity());
                 data.updateBranchFiltertimestamp(item.getItemId(), new Date().getTime());
 
-                getActivity().invalidateOptionsMenu();
-                getActivity().getSupportLoaderManager().restartLoader(LOADER_ID, null, this);
+                refreshViewAfterChange();
                 return true;
             }
         }
@@ -408,6 +464,11 @@ public class StarredFragment extends Fragment implements
     @Override
     public void accountSelected(Account account) {
         currentFilterBranchId = FILTER_BRANCH_ALL;
+        refreshViewAfterChange();
+    }
+
+    private void refreshViewAfterChange() {
+        updateHeader();
         getActivity().invalidateOptionsMenu();
         getActivity().getSupportLoaderManager().restartLoader(LOADER_ID, null, this);
     }
@@ -446,11 +507,12 @@ public class StarredFragment extends Fragment implements
                 //see Snackbar.Callback docs for event details
                 if (event == Snackbar.Callback.DISMISS_EVENT_TIMEOUT) {
                     // Snackbar closed on its own
+                    // also kein Undo, also remove item!
                     StarDataSource data = new StarDataSource(getActivity());
                     String bib = app.getLibrary().getIdent();
                     data.remove(item);
-                    getActivity().invalidateOptionsMenu();
-                    // TODO wenn gefiltert, wird Fragment nicht removed
+
+                    refreshViewAfterChange();
                 }
             }
 
@@ -471,8 +533,7 @@ public class StarredFragment extends Fragment implements
                 data.removeAll(bib);
 
                 currentFilterBranchId = FILTER_BRANCH_ALL;
-
-                getActivity().invalidateOptionsMenu();
+                refreshViewAfterChange();
             }
         });
         snackbar.show();
@@ -501,9 +562,7 @@ public class StarredFragment extends Fragment implements
 
                                currentFilterBranchId = FILTER_BRANCH_ALL;
 
-                               getActivity().invalidateOptionsMenu();
-                               // finish (wie bei AccountEditActivity passt hier nicht)
-                               // getActivity().finish();
+                               refreshViewAfterChange();
                            }
                        })
                .setOnCancelListener(
@@ -592,6 +651,9 @@ public class StarredFragment extends Fragment implements
             StarDataSource data = new StarDataSource(getActivity());
             String bib = app.getLibrary().getIdent();
             Branch branch = data.getBranch(bib, currentFilterBranchId);
+            if (branch == null) {
+                logDebug("No Branch for bib=%s branchId=%d", bib, currentFilterBranchId);
+            }
             text = getString(R.string.starred_header_branch, countItems,
                     branch.getName());
             long minStatusTime = branch.getMinStatusTime();
@@ -883,13 +945,7 @@ public class StarredFragment extends Fragment implements
     public void onResume() {
         getActivity().getSupportLoaderManager().restartLoader(LOADER_ID, null, this);
         if (getContext() != null) {
-            SharedPreferences sp = PreferenceManager
-                    .getDefaultSharedPreferences(getContext());
-            currentFilterBranchId = sp.getInt(STATE_FILTER_BRANCH, FILTER_BRANCH_ALL);
-            if (sp.contains(STATE_ACTIVATED_POSITION)) {
-                setActivatedPosition(sp
-                        .getInt(STATE_ACTIVATED_POSITION, AdapterView.INVALID_POSITION));
-            }
+            restoreState(null);
         }
         super.onResume();
     }
@@ -900,6 +956,11 @@ public class StarredFragment extends Fragment implements
             SharedPreferences sp = PreferenceManager
                     .getDefaultSharedPreferences(getContext());
             SharedPreferences.Editor editor = sp.edit();
+
+            String currentBib = app.getLibrary().getIdent();
+            if (currentBib != null) {
+                editor.putString(STATE_FILTER_BIB, currentBib);
+            }
 
             if (currentFilterBranchId != 0) {
                 editor.putInt(STATE_FILTER_BRANCH, currentFilterBranchId);
@@ -1081,8 +1142,8 @@ public class StarredFragment extends Fragment implements
                 int nProgress = 0;
                 res = new ArrayList<FetchBranchesResult>();
                 for (Starred starred: starredList) {
-                    logDebug("FetchBranchesTask.doInBackground starred.title = %s)", starred.getTitle());
-                    logDebug("FetchBranchesTask.doInBackground starrd.mnr = %s)", starred.getMNr());
+                    logDebug("FetchBranchesTask.doInBackground starred.title = %s", starred.getTitle());
+                    logDebug("FetchBranchesTask.doInBackground starrd.mnr = %s", starred.getMNr());
 
                     if (starred.getMNr() == null || starred.getMNr().isEmpty()) {
                         // Mediennummer ist notwendig für getResultById
