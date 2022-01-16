@@ -287,6 +287,27 @@ public class StarDataSource {
         return item;
     }
 
+    public int getCountItemWithValidMnr(String bib) {
+
+        final String sel = "bib = ? AND medianr IS NOT NULL";
+        String[] selArg = {bib};
+        String[] proj = { "count(*)" };
+
+        Cursor cursor = context
+                .getContentResolver()
+                .query(((OpacClient) context.getApplication())
+                                .getStarProviderStarUri(),
+                        proj, sel, selArg, null);
+
+        int count = 0;
+        cursor.moveToFirst();
+        if (!cursor.isAfterLast()) {
+            count = cursor.getInt(0);
+        }
+        cursor.close();
+        return count;
+    }
+
     public Starred getItem(long id) {
         String[] selA = {String.valueOf(id)};
         Cursor cursor = context
@@ -494,7 +515,7 @@ public class StarDataSource {
     }
 
     public int getCountStarredWithoutBranch(String bib) {
-        String[] proj = {"count(*) as count"};
+        String[] proj = {"count(*)"};
         String[] selA = {bib};
         Cursor cursor = context
                 .getContentResolver()
