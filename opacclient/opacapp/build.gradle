@@ -42,6 +42,14 @@ android {
             proguardFiles 'proguard-rules.txt'
             buildConfigField("String", "SENTRY_DSN", dsn != null ? "\"$dsn\"" : "null")
         }
+        // https://developer.android.com/studio/build/build-variants
+        justy {
+            minifyEnabled true
+            signingConfig signingConfigs.release
+            proguardFiles 'proguard-rules.txt'
+            applicationIdSuffix ".justy"
+            versionNameSuffix "-justy"
+        }
         debug {
             debuggable true
             applicationIdSuffix ".debug"
@@ -133,9 +141,14 @@ dependencies {
     implementation 'com.github.bumptech.glide:okhttp3-integration:1.5.0@aar'
     implementation 'net.sourceforge.streamsupport:streamsupport-cfuture:1.7.2'
     implementation 'org.droidparts:droidparts-misc:3.2.5'
-    
+
 // Flavor
     googlePlayServicesImplementation 'com.google.android.gms:play-services-basement:17.6.0'
+
+// Justy
+    justyImplementation 'com.facebook.stetho:stetho:1.5.0'
+    justyImplementation 'com.facebook.stetho:stetho-okhttp3:1.5.0'
+    justyImplementation 'com.squareup.leakcanary:leakcanary-android:1.4-beta2'
 
 // Debug
     debugImplementation 'com.facebook.flipper:flipper:0.162.0'
