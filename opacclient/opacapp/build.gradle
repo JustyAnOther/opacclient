@@ -38,6 +38,14 @@ android {
             signingConfig signingConfigs.release
             proguardFiles 'proguard-rules.txt'
         }
+        // https://developer.android.com/studio/build/build-variants
+        justy {
+            minifyEnabled true
+            signingConfig signingConfigs.release
+            proguardFiles 'proguard-rules.txt'
+            applicationIdSuffix ".justy"
+            versionNameSuffix "-justy"
+        }
         debug {
             debuggable true
             applicationIdSuffix ".debug"
@@ -113,6 +121,9 @@ dependencies {
     implementation 'net.sourceforge.streamsupport:streamsupport-cfuture:1.6.0'
     implementation 'androidx.multidex:multidex:2.0.0'
     implementation 'org.droidparts:droidparts-misc:3.2.5'
+    justyImplementation 'com.facebook.stetho:stetho:1.5.0'
+    justyImplementation 'com.facebook.stetho:stetho-okhttp3:1.5.0'
+    justyImplementation 'com.squareup.leakcanary:leakcanary-android:1.4-beta2'
     debugImplementation 'com.facebook.stetho:stetho:1.5.0'
     debugImplementation 'com.facebook.stetho:stetho-okhttp3:1.5.0'
     debugImplementation 'com.squareup.leakcanary:leakcanary-android:1.4-beta2'
