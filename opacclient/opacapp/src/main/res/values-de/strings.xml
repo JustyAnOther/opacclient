@@ -385,7 +385,8 @@
     <string name="sort_direction_desc">absteigend</string>
     <string name="history_prolongCount">Anzahl Verlängerungen</string>
     <string name="starred_refresh_branches">Status aktualisieren</string>
-    <string name="starred_filter_no_branch">Ohne Branch</string>
+    <string name="starred_filter_no_branch">Ohne Zweigstelle</string>
+    <string name="starred_filter_no_branch_count">Ohne Zweigstelle (%1$d)</string>
     <string name="starred_header_branch">%1$d Medien in %2$s</string>
     <string name="starred_header">%1d Medien</string>
     <string name="starred_remove_all">Alle löschen</string>
