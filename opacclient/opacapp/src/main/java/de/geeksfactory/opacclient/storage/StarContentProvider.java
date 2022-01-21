@@ -242,10 +242,11 @@ public class StarContentProvider extends ContentProvider {
                         selection, selectionArgs, "name", "count >0", sortOrder);
                 break;
             case STAR_JOIN_STAR_BRANCH_DIR:
-                cursor = queryDatabase(StarDatabase.STAR_TABLE + " LEFT JOIN "
-                                + StarDatabase.STAR_BRANCH_TABLE + " ON "
-                                + StarDatabase.STAR_TABLE + ".id = "
-                                + StarDatabase.STAR_BRANCH_TABLE + ".id_star"
+                String table = StarDatabase.STAR_TABLE + " LEFT JOIN "
+                        + StarDatabase.STAR_BRANCH_TABLE + " ON "
+                        + StarDatabase.STAR_TABLE + ".id = "
+                        + StarDatabase.STAR_BRANCH_TABLE + ".id_star";
+                cursor = queryDatabase(table
                         , projection,
                         selection, selectionArgs, "starred.id", null, sortOrder);
                 break;
