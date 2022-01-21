@@ -910,6 +910,7 @@ public class StarredFragment extends Fragment implements
 
                     importJson(dataSource, list);
 
+                    refreshViewAfterChange();
                     adapter.notifyDataSetChanged();
                     Snackbar.make(getView(), R.string.info_starred_updated,
                             Snackbar.LENGTH_SHORT).show();
