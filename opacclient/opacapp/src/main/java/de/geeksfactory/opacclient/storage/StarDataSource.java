@@ -113,7 +113,10 @@ public class StarDataSource {
             StarBranchItem item = branches.get(branch);
             // Starred-Branch-Relation neu anlegen
             LOGGER.info("insertStarBranch( starId = {}, branchId = {})" , starId, branchId);
-            insertStarBranch(starId, branchId, item.getStatus(), now, item.getReturnDate());
+            long statusTime = ((item.getStatus() !=null) || (item.getReturnDate()!=0)) ? now : 0;
+            LOGGER.info("item.status = {}, .returnDate = {}, statusTime = {}"
+                    , item.getStatus(), item.getReturnDate(), statusTime);
+            insertStarBranch(starId, branchId, item.getStatus(), statusTime, item.getReturnDate());
         }
     }
 
