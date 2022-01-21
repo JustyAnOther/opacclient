@@ -515,18 +515,14 @@ public class StarDataSource {
     }
 
     public int getCountStarredWithoutBranch(String bib) {
-        String[] proj = {"count(*)"};
+        String[] proj = {"starred.id"};
         String[] selA = {bib};
         Cursor cursor = context
                 .getContentResolver()
                 .query(StarContentProvider.STAR_JOIN_STAR_BRANCH_URI, proj,
                         StarDatabase.STAR_WHERE_LIB_BRANCH_IS_NULL, selA, null);
 
-        int count = 0;
-        cursor.moveToFirst();
-        if (!cursor.isAfterLast()) {
-            count = cursor.getInt(0);
-        }
+        int count = cursor.getCount();
         cursor.close();
 
         return count;
