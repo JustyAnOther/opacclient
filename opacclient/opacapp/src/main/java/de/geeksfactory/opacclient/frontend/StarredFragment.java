@@ -1210,8 +1210,7 @@ public class StarredFragment extends Fragment implements
                 }
             }
 
-            updateHeader();
-            getActivity().invalidateOptionsMenu();
+            refreshViewAfterChange();
 
             String text = getString(R.string.starred_update_branch_success, res.size());
             Toast.makeText(getActivity(), text, Toast.LENGTH_LONG).show();
