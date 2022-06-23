@@ -101,6 +101,9 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
     protected Document s_reusedoc;
     protected String s_nextbutton = "$Toolbar_5";
     protected String s_previousbutton = "$Toolbar_4";
+    protected List<NameValuePair> advancedSearchFormBody = null;
+    protected boolean accountFormOldstyle = false;
+    protected List<NameValuePair> accountFormBody = null;
 
     public static Map<String, List<String>> getQueryParams(String url) {
         try {
@@ -210,17 +213,21 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
         return doc;
     }
 
-    @Override
-    public void start() throws IOException {
+    private void _start() throws IOException, OpacErrorException {
         try {
             s_requestCount = -1;
-            Document doc = htmlGet(opac_url + "?"
-                    + data.getString("startparams"));
+            s_exts = null;
+            s_service = null;
+            Document doc = htmlGet(opac_url + "?" + data.getString("startparams"));
+
+            if (doc.select(".msgpage").size() > 0) {
+                throw new OpacErrorException(doc.select(".msgpage").text());
+            }
 
             Pattern padSid = Pattern
                     .compile(".*;jsessionid=([0-9A-Fa-f]+)[^0-9A-Fa-f].*");
             for (Element navitem : doc
-                    .select("#unav li a, #hnav li a, .tree_ul li a, .search-adv")) {
+                    .select("#unav li a, #hnav li a, .tree_ul li a, a.search-adv")) {
                 // Düsseldorf uses a custom layout where the navbar is .tree_ul
                 // in Stuttgart, the navbar is #hnav and advanced search is linked outside the
                 // navbar as .search-adv-repeat
@@ -236,6 +243,41 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
                     s_sid = objid_matcher.group(1);
                 }
             }
+
+
+            // Old OPACs (eg Nürnberg in Dec 21) have an <a> link to the account form
+            // New OPACs (eg Zürich in Dec 21) have a button instead
+            for (Element navitem : doc.select("#unav li a, #hnav li a, .tree_ul li a")) {
+                if (navitem.attr("href").contains("sp=SBK")) {
+                    accountFormOldstyle = true;
+                    break;
+                }
+            }
+            updatePageform(doc);
+            if (!accountFormOldstyle) {
+                List<NameValuePair> nvpairs_a = new ArrayList(s_pageform);
+                nvpairs_a.add(new BasicNameValuePair("$ScriptButton_hidden", "BK"));
+                nvpairs_a.add(new BasicNameValuePair("selected", "ZTEXT       *SBK"));
+                accountFormBody = nvpairs_a;
+            }
+
+            if (s_exts == null && doc.select("input.search-adv").size() > 0) {
+                // Advanced search does not exist in menu, use account menu item to get s_exts.
+                // advanced search is accessed through a HTTP POST.
+                // example: HfM Karlsruhe.
+                for (Element navitem : doc.select("#unav li a, #hnav li a, .tree_ul li a")) {
+                    if (navitem.text().contains("Konto")) {
+                        s_exts = getQueryParams(navitem.attr("href")).get("sp");
+                        break;
+                    }
+                }
+
+                Element input = doc.select("input.search-adv").first();
+                List<NameValuePair> nvpairs = new ArrayList(s_pageform);
+                nvpairs.add(new BasicNameValuePair(input.attr("name"), input.attr("value")));
+                advancedSearchFormBody = nvpairs;
+            }
+            s_pageform = null;
             if (s_exts == null) {
                 s_exts = Collections.singletonList("SS6");
             }
@@ -247,6 +289,24 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
     }
 
     @Override
+    public void start() throws IOException {
+        try {
+            _start();
+        } catch (OpacErrorException e) {
+            throw new IOException("Failed to start");
+        }
+    }
+
+    private Document getAdvancedSearchDoc() throws IOException {
+        if (advancedSearchFormBody != null) {
+            return htmlPost(opac_url + ";jsessionid=" + s_sid, advancedSearchFormBody);
+        } else {
+            return htmlGet(opac_url + ";jsessionid=" + s_sid + "?service="
+                    + s_service + getSpParams());
+        }
+    }
+
+    @Override
     protected String getDefaultEncoding() {
         return "UTF-8";
     }
@@ -254,12 +314,11 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
     @Override
     public SearchRequestResult search(List<SearchQuery> queries)
             throws IOException, OpacErrorException {
-        start();
+        _start();
         // TODO: There are also libraries with a different search form,
         // s_exts=SS2 instead of s_exts=SS6
         // e.g. munich. Treat them differently!
-        Document doc = htmlGet(opac_url + ";jsessionid=" + s_sid + "?service="
-                + s_service + getSpParams());
+        Document doc = getAdvancedSearchDoc();
 
         int dropdownTextCount = 0;
         int totalCount = 0;
@@ -306,15 +365,16 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
                     doc.select("input#" + query.getKey()).val(query.getValue());
                 } else {
                     if (doc.select("select#SUCH01_1").size() == 0 &&
-                            doc.select("input[fld=FELD01_" + dropdownTextCount + "]").size() > 0) {
+                            doc.select("input[data-fld=FELD01_" + dropdownTextCount + "], input[fld=FELD01_\" + dropdownTextCount + \"]").size() > 0) {
                         // Hack needed for Nürnberg
-                        doc.select("input[fld=FELD01_" + dropdownTextCount + "]").first()
+                        doc.select("input[data-fld=FELD01_" + dropdownTextCount + "], input[fld=FELD01_\" + dropdownTextCount + \"]").first()
                            .previousElementSibling().val(query.getKey());
-                        doc.select("input[fld=FELD01_" + dropdownTextCount + "]")
+                        doc.select("input[data-fld=FELD01_" + dropdownTextCount + "], input[fld=FELD01_\" + dropdownTextCount + \"]")
                            .val(query.getValue());
                     } else {
                         doc.select("select#SUCH01_" + dropdownTextCount).val(query.getKey());
-                        doc.select("input#FELD01_" + dropdownTextCount).val(query.getValue());
+                        doc.select("input#FELD01_" + dropdownTextCount
+                                + ", input[data-fld=FELD01_" + dropdownTextCount + "input[fld=FELD01_\" + dropdownTextCount + \"]]").val(query.getValue());
                     }
                 }
 
@@ -426,9 +486,9 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
     private SearchRequestResult parse_search(Document doc, int page)
             throws OpacErrorException, SingleResultFound {
 
-        if (doc.select(".message h1").size() > 0
+        if (doc.select(".message h1, .msgpage h1").size() > 0
                 && doc.select("#right #R06").size() == 0) {
-            throw new OpacErrorException(doc.select(".message h1").text());
+            throw new OpacErrorException(doc.select(".message h1, .msgpage h1").text());
         }
         if (doc.select("#OPACLI").text().contains("nicht gefunden")) {
             throw new OpacErrorException(
@@ -836,8 +896,8 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
             }
         }
         doc = htmlPost(opac_url + ";jsessionid=" + s_sid, form);
-        if (doc.select(".message h1").size() > 0) {
-            String msg = doc.select(".message h1").text().trim();
+        if (doc.select(".message h1, .msgpage h1").size() > 0) {
+            String msg = doc.select(".message h1, .msgpage h1").text().trim();
             res = new ReservationResult(MultiStepResult.Status.ERROR, msg);
             form = new ArrayList<>();
             for (Element input : doc.select("input")) {
@@ -920,12 +980,16 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
                     }
                 }
                 if (doc.select("#BENJN_1").size() > 0) {
-                    // Notification not requested because some libraries notify by snail mail
-                    // and take a fee for it (Example: Stuttgart_Uni)
-                    doc.select("#BENJN_1").attr("value", "Nein");
+                    if (data.optBoolean("reservation_notification_enabled")) {
+                        doc.select("#BENJN_1").attr("value", "Ja");
+                    } else {
+                        // Notification not requested because some libraries notify by snail mail
+                        // and take a fee for it (Example: Stuttgart_Uni)
+                        doc.select("#BENJN_1").attr("value", "Nein");
+                    }
                 }
-                if (doc.select(".message h1").size() > 0) {
-                    String msg = doc.select(".message h1").text().trim();
+                if (doc.select(".message h1, .msgpage h1").size() > 0) {
+                    String msg = doc.select(".message h1, .msgpage h1").text().trim();
                     form = new ArrayList<>();
                     for (Element input : doc.select("input")) {
                         if (!"image".equals(input.attr("type"))
@@ -959,8 +1023,10 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
                     res = new ReservationResult(MultiStepResult.Status.OK);
                     doc = htmlPost(opac_url + ";jsessionid=" + s_sid, form);
 
-                    if (doc.select("input[name=textButton]").attr("value")
-                           .contains("kostenpflichtig bestellen")) {
+                    String buttonText = doc.select("input[name=textButton]")
+                            .attr("value");
+                    if (buttonText.contains("kostenpflichtig bestellen")
+                            || buttonText.contains("Bestellung / Vormerkung abschicken")) {
                         // Munich, new version in Zürich
                         if (doc.select(".achtung").size() > 0 && !"confirmed".equals(selection)) {
                             // fee warning (new version in Zürich 2019/06)
@@ -986,8 +1052,15 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
                         }
                     }
 
-                    if (doc.select(".message h1").size() > 0) {
-                        String msg = doc.select(".message h1").text().trim();
+                    String msgTest = "";
+                    if (doc.select(".message h1, .msgpage h1").size() > 0) {
+                        msgTest = doc.select(".message h1, .msgpage h1").text().trim();
+                    } else if (doc.select(".hinweis").size() > 0) {
+                        msgTest = doc.select(".hinweis").text().trim();
+                    }
+
+                    if ( ! msgTest.isEmpty() ) {
+                        String msg = msgTest;
                         form = new ArrayList<>();
                         for (Element input : doc.select("input")) {
                             if (!"image".equals(input.attr("type"))
@@ -998,7 +1071,8 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
                             }
                         }
                         doc = htmlPost(opac_url + ";jsessionid=" + s_sid, form);
-                        if (!msg.contains("Reservation ist erfolgt")) {
+                        // Reservation || Der Bestellwunsch (Munich)
+                        if (!msg.contains(" ist erfolgt")) {
                             res = new ReservationResult(
                                     MultiStepResult.Status.ERROR, msg);
                         } else {
@@ -1071,6 +1145,7 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
                     && !"submit".equals(input.attr("type"))
                     && !"checkbox".equals(input.attr("type"))
                     && !"".equals(input.attr("name"))) {
+                if (input.attr("value").equals("")) continue;
                 s_pageform.add(new BasicNameValuePair(input.attr("name"), input
                         .attr("value")));
             }
@@ -1083,11 +1158,13 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
         String alink = null;
         Document doc;
 
-        start();
-        doc = htmlGet(opac_url + ";jsessionid=" + s_sid + "?service="
-                + s_service + getSpParams("SBK"));
         try {
-            doc = handleLoginForm(doc, account);
+            _start();
+        } catch (OpacErrorException e) {
+            return new ProlongResult(Status.ERROR, e.getMessage());
+        }
+        try {
+            doc = login(account);
         } catch (OpacErrorException e) {
             return new ProlongResult(Status.ERROR, e.getMessage());
         }
@@ -1164,11 +1241,13 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
             String selection) throws IOException {
         String alink = null;
         Document doc;
-        start();
-        doc = htmlGet(opac_url + ";jsessionid=" + s_sid + "?service="
-                + s_service + getSpParams("SBK"));
         try {
-            doc = handleLoginForm(doc, account);
+            _start();
+        } catch (OpacErrorException e) {
+            return new ProlongAllResult(Status.ERROR, e.getMessage());
+        }
+        try {
+            doc = login(account);
         } catch (OpacErrorException e) {
             return new ProlongAllResult(Status.ERROR, e.getMessage());
         }
@@ -1240,11 +1319,9 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
         String rlink = null;
         Document doc;
         rlink = media.split("\\|")[1].replace("requestCount=", "fooo=");
-        start();
-        doc = htmlGet(opac_url + ";jsessionid=" + s_sid + "?service="
-                + s_service + getSpParams("SBK"));
+        _start();
         try {
-            doc = handleLoginForm(doc, account);
+            doc = login(account);
         } catch (OpacErrorException e) {
             return new CancelResult(Status.ERROR, e.getMessage());
         }
@@ -1308,14 +1385,24 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
         return new CancelResult(Status.OK);
     }
 
+    private Document login(Account account) throws IOException, OpacErrorException {
+        Document doc;
+        if (accountFormOldstyle) {
+            doc = htmlGet(opac_url + ";jsessionid=" + s_sid + "?service="
+                    + s_service + getSpParams("SBK"));
+        } else {
+            doc = htmlPost(opac_url + ";jsessionid=" + s_sid, accountFormBody);
+        }
+        doc = handleLoginForm(doc, account);
+        return doc;
+    }
+
     @Override
     public AccountData account(Account account) throws IOException,
             JSONException, OpacErrorException {
-        start();
+        _start();
 
-        Document doc = htmlGet(opac_url + ";jsessionid=" + s_sid + "?service="
-                + s_service + getSpParams("SBK"));
-        doc = handleLoginForm(doc, account);
+        Document doc = login(account);
 
         boolean split_title_author = true;
         if (doc.head().html().contains("VOEBB")) {
@@ -1341,7 +1428,7 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
             if (tr.select("a").size() == 1) {
                 if (tr.select("a").first().absUrl("href").contains("sp=SZA")) {
                     alink = tr.select("a").first().absUrl("href");
-                    anum = Integer.parseInt(tr.child(0).text().trim());
+                    anum = Integer.parseInt(tr.child(0).text().replaceAll("[^\\d]", "").trim());
                 }
             }
         }
@@ -1368,7 +1455,7 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
                 form.add(new BasicNameValuePair(prolongTest,
                         "Markierte Titel verlängerbar?"));
                 Document adoc_new = htmlPost(opac_url + ";jsessionid=" + s_sid, form);
-                if (adoc_new.select(".message h1").size() == 0) {
+                if (adoc_new.select(".message h1, .msgpage h1").size() == 0) {
                     adoc = adoc_new;
                 }
             }
@@ -1385,7 +1472,7 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
                             .attr("value")));
                 }
                 if ("submit".equals(input.attr("type")) &&
-                        "Abbrechen".equals(input.attr("value")) && !cancelButton) {
+                        ("Abbrechen".equals(input.attr("value")) || input.attr("value").contains("Zur Übersicht")) && !cancelButton) {
                     // Stuttgart: Cancel button instead of toolbar back button
                     form.add(new BasicNameValuePair(input.attr("name"), input.attr("value")));
                     cancelButton = true;
@@ -1418,7 +1505,7 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
                             tr.select("a").text(),
                             tr.select("a").first().absUrl("href"),
                     });
-                    rnum += Integer.parseInt(tr.child(0).text().trim());
+                    rnum += Integer.parseInt(tr.child(0).text().replaceAll("[^\\d]", "").trim());
                 }
             }
         }
@@ -1447,8 +1534,8 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
             if (rdoc.select("#Toolbar_0").size() > 0) {
                 form.add(new BasicNameValuePair("$Toolbar_0.x", "1"));
                 form.add(new BasicNameValuePair("$Toolbar_0.y", "1"));
-            } else if (rdoc.select("input[value=Abbrechen]").size() > 0) {
-                Element button = rdoc.select("input[value=Abbrechen]").first();
+            } else if (rdoc.select("input[value=Abbrechen], input[value*=Übersicht]").size() > 0) {
+                Element button = rdoc.select("input[value=Abbrechen], input[value*=Übersicht]").first();
                 form.add(new BasicNameValuePair(button.attr("name"), button.attr("value")));
             }
             htmlPost(opac_url + ";jsessionid=" + s_sid, form);
@@ -1620,7 +1707,14 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
         final char SPACE = (char) 32; // " ".charAt(0);
 
         final String[] split = text.split(seps);
-        String title = split[0];
+
+        MediaType mediaType = checkType(split[0], true);
+        int indexTitle = 0;
+        if ((mediaType!=null) && (mediaType != MediaType.UNKNOWN)) {
+            indexTitle = 1;
+        }
+        String title = split[indexTitle];
+
         if (split_title_author) {
             title = title.replaceFirst("([^:;\n]+)[:;\n](.*)$", "$1");
         }
@@ -1651,12 +1745,12 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
 
         // Leading/Trailing Spaces entfernen
         // title = title.trim();
-        setTitleAndType(item, title);
+        setTitleAndType(item, mediaType, title);
 
         // Autor
-        if (split.length > 1) {
+        if (split.length > indexTitle) {
             item.setAuthor(
-                    split[1].replaceFirst("([^:;\n]+)[:;\n](.*)$", "$1").trim());
+                    split[indexTitle+1].replaceFirst("([^:;\n]+)[:;\n](.*)$", "$1").trim());
         }
 
         // id is always the last one...
@@ -1664,27 +1758,43 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
         item.setId(id);
     }
 
-    private static void setTitleAndType(AccountItem item, String title) {
+    /**
+     *
+     * @param text
+     * @param only true: text soll nur aus Mediatype(key) und [] bestehen
+     *             false: text soll mit mit [Mediatype(key)] beginnen
+     * @return
+     */
+    private static MediaType checkType(String text, boolean only) {
+        if (text.startsWith("[")) {
+            int ei = text.indexOf("]");
+            if ( (ei > 0) && (!only || (ei+1 == text.length()))) {
+                String type = text.substring(1, ei);
+                if (types.containsKey(type)) {
+                    // [...] mit bekannten key
+                    return types.get(type);
+                } else {
+                    // [...] aber ... unbekannt
+                    return MediaType.UNKNOWN;
+                }
+            }
+        }
+        // kein [...]
+        return null;
+    }
+
+    private static void setTitleAndType(AccountItem item, MediaType mediaType, String title) {
         final char SPACE = (char) 32; // " ".charAt(0);
 
         // Prefix MediaType "[...] ..." entfernen, z.B. "[DVD-Video] ..." am Anfang
-        if (title.startsWith("[")) {
-            int ei = title.indexOf("]");
-            if (ei > 0) {
-                String type = title.substring(1, ei);
-                if (types.containsKey(type)) {
-                    item.setMediaType(types.get(type));
-                    do {
-                        ei++;
-                    } while (title.charAt(ei) == SPACE);
-                    title = title.substring(ei);
-                } else {
-                    item.setMediaType(MediaType.UNKNOWN);
-                }
-            }
-        } else {
+        if (mediaType == null) {
+            checkType(title, false);
+        }
+        if (mediaType == null) {
             // Default MediaType is BOOK
             item.setMediaType(MediaType.BOOK);
+        } else {
+            item.setMediaType(mediaType);
         }
 
         // Postfix MediaType "... [...]" entfernen, z. B. "... [CD]" am Ende
@@ -1739,14 +1849,17 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
                         .attr("value")));
             }
         }
-        Element inputSend = doc.select("input[type=submit]").first();
+        Element inputSend = doc.select("input[type=submit][value=Anmelden], input[type=submit][value=Anmeldung abschicken]").first();
+        if (inputSend == null) {
+            inputSend = doc.select("input[type=submit]").first();
+        }
         form.add(new BasicNameValuePair(inputSend.attr("name"), inputSend
                 .attr("value")));
 
         doc = htmlPost(opac_url + ";jsessionid=" + s_sid, form);
 
-        if (doc.select(".message h1, .alert").size() > 0) {
-            String msg = doc.select(".message h1, .alert").text().trim();
+        if (doc.select(".message h1, .alert, .msgpage h1").size() > 0) {
+            String msg = doc.select(".message h1, .alert, .msgpage h1").text().trim();
             form = new ArrayList<>();
             for (Element input : doc.select("input")) {
                 if (!"image".equals(input.attr("type"))
@@ -1771,20 +1884,33 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
 
     @Override
     public List<SearchField> parseSearchFields() throws IOException,
-            JSONException {
-        start();
+            JSONException, OpacErrorException {
+        _start();
 
-        Document doc = htmlGet(opac_url + ";jsessionid=" + s_sid + "?service="
-                + s_service + getSpParams());
-        return parseSearchFields(doc);
-    }
+        Document doc = getAdvancedSearchDoc();
 
-    static List<SearchField> parseSearchFields(Document doc) throws IOException,
-             JSONException {
         List<SearchField> fields = new ArrayList<>();
+
+        // Save data so that the search() function knows that this
+        // is not a selectable search field
+        JSONObject selectableData = new JSONObject();
+        selectableData.put("selectable", false);
+
+        // free search field (exists e.g. in HfM Karlsruhe)
+        Element freeSearchField = doc.select("input[data-fld=THEMA2_1], input[fld=THEMA2_1], #Autosuggest").first();
+        if (freeSearchField != null) {
+            TextSearchField field = new TextSearchField();
+            field.setId(freeSearchField.id());
+            field.setFreeSearch(true);
+            field.setDisplayName(freeSearchField.parent().select("label").text());
+            field.setHint("");
+            field.setData(selectableData);
+            fields.add(field);
+        }
+
         // dropdown to select which field you want to search in
         Elements searchoptions = doc.select("#SUCH01_1 option");
-        if (searchoptions.size() == 0 && doc.select("input[fld=FELD01_1]").size() > 0) {
+        if (searchoptions.size() == 0 && doc.select("input[data-fld=FELD01_1], input[fld=FELD01_1]").size() > 0) {
             // Hack is needed in Nuernberg
             searchoptions = doc.select("input[fld=FELD01_1]").first().previousElementSibling()
                                .select("option");
@@ -1795,7 +1921,7 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
             // Damit doppelte Optionen nicht mehrfach auftauchen
             // (bei Stadtbücherei Stuttgart der Fall)
             if (fieldIds.contains(opt.attr("value"))) continue;
-            
+
             TextSearchField field = new TextSearchField();
             field.setId(opt.attr("value"));
             field.setDisplayName(opt.text());
@@ -1804,11 +1930,6 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
 
             fieldIds.add(field.getId());
         }
-
-        // Save data so that the search() function knows that this
-        // is not a selectable search field
-        JSONObject selectableData = new JSONObject();
-        selectableData.put("selectable", false);
 
         for (Element row : doc.select("div[id~=F\\d+], .search-adv-source")) {
             if (row.select("input[type=text]").size() == 1
@@ -1937,11 +2058,9 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
     @Override
     public void checkAccountData(Account account) throws IOException,
             JSONException, OpacErrorException {
-        start();
+        _start();
 
-        Document doc = htmlGet(opac_url + ";jsessionid=" + s_sid + "?service="
-                + s_service + getSpParams("SBK"));
-        handleLoginForm(doc, account);
+        login(account);
     }
 
     @Override
