@@ -1931,7 +1931,7 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
             fieldIds.add(field.getId());
         }
 
-        for (Element row : doc.select("div[id~=F\\d+], .search-adv-source")) {
+        for (Element row : doc.select("div[id~=F\\d+], .search-adv-source, .field-library")) {
             if (row.select("input[type=text]").size() == 1
                     && row.select("input, select").first().tagName()
                           .equals("input")) {
@@ -1960,7 +1960,9 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
                         }
                     }
                     for (Element opt : select.select("option")) {
-                        field.addDropdownValue(opt.attr("value"), opt.text());
+                        if (!"Bitte auswählen".equals(opt.val())) {
+                            field.addDropdownValue(opt.attr("value"), opt.text());
+                        }
                     }
                     if (field.getDisplayName().equals("oder Bezirk") ||
                             field.getDisplayName().equals("oder Bibliothek")) {
