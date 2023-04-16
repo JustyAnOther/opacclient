@@ -29,8 +29,7 @@ import android.content.SharedPreferences;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
-import androidx.loader.app.LoaderManager;
-import androidx.preference.PreferenceManager;
+import android.preference.PreferenceManager;
 import android.text.Html;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -72,21 +71,21 @@ import de.geeksfactory.opacclient.R;
 import de.geeksfactory.opacclient.frontend.OpacActivity.AccountSelectedListener;
 import de.geeksfactory.opacclient.objects.Account;
 import de.geeksfactory.opacclient.objects.SearchResult;
+import de.geeksfactory.opacclient.objects.HistoryItem;
 import de.geeksfactory.opacclient.searchfields.SearchField;
 import de.geeksfactory.opacclient.searchfields.SearchField.Meaning;
 import de.geeksfactory.opacclient.searchfields.SearchQuery;
 import de.geeksfactory.opacclient.storage.JsonSearchFieldDataSource;
-import de.geeksfactory.opacclient.storage.StarDataSource;
-import de.geeksfactory.opacclient.storage.StarDatabase;
-import de.geeksfactory.opacclient.storage.Starred;
+import de.geeksfactory.opacclient.storage.HistoryDatabase;
+import de.geeksfactory.opacclient.storage.HistoryDataSource;
 import de.geeksfactory.opacclient.utils.CompatibilityUtils;
 
-public class StarredFragment extends Fragment implements
+public class HistoryFragment extends Fragment implements
         LoaderCallbacks<Cursor>, AccountSelectedListener {
 
     private static final String STATE_ACTIVATED_POSITION = "activated_position";
     private static final String JSON_LIBRARY_NAME = "library_name";
-    private static final String JSON_STARRED_LIST = "starred_list";
+    private static final String JSON_HISTORY_LIST = "history_list";
     private static final String JSON_ITEM_MNR = "item_mnr";
     private static final String JSON_ITEM_TITLE = "item_title";
     private static final String JSON_ITEM_MEDIATYPE = "item_mediatype";
@@ -100,7 +99,7 @@ public class StarredFragment extends Fragment implements
     private ListView listView;
     private int activatedPosition = ListView.INVALID_POSITION;
     private TextView tvWelcome;
-    private Starred sItem;
+    private HistoryItem historyItem;
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
@@ -108,19 +107,19 @@ public class StarredFragment extends Fragment implements
 
         setHasOptionsMenu(true);
 
-        view = inflater.inflate(R.layout.fragment_starred, container, false);
+        view = inflater.inflate(R.layout.fragment_history, container, false);
         app = (OpacClient) getActivity().getApplication();
 
         adapter = new ItemListAdapter();
 
-        listView = (ListView) view.findViewById(R.id.lvStarred);
-        tvWelcome = (TextView) view.findViewById(R.id.tvWelcome);
+        listView = (ListView) view.findViewById(R.id.lvHistory);
+        tvWelcome = (TextView) view.findViewById(R.id.tvHistoryWelcome);
 
         listView.setOnItemClickListener(new OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> parent, View view,
                     int position, long id) {
-                Starred item = (Starred) view.findViewById(R.id.ivDelete)
+                HistoryItem item = (HistoryItem) view.findViewById(R.id.ivDelete)
                                              .getTag();
                 if (item.getMNr() == null || item.getMNr().equals("null")
                         || item.getMNr().equals("")) {
@@ -164,7 +163,7 @@ public class StarredFragment extends Fragment implements
         listView.setClickable(true);
         listView.setTextFilterEnabled(true);
 
-        LoaderManager.getInstance(this)
+        getActivity().getSupportLoaderManager()
                      .initLoader(0, null, this);
         listView.setAdapter(adapter);
 
@@ -183,7 +182,7 @@ public class StarredFragment extends Fragment implements
     @Override
     public void onCreateOptionsMenu(android.view.Menu menu,
             MenuInflater inflater) {
-        inflater.inflate(R.menu.activity_starred, menu);
+        inflater.inflate(R.menu.activity_history, menu);
         super.onCreateOptionsMenu(menu, inflater);
     }
 
@@ -204,12 +203,12 @@ public class StarredFragment extends Fragment implements
 
     @Override
     public void accountSelected(Account account) {
-        LoaderManager.getInstance(this).restartLoader(0, null, this);
+        getActivity().getSupportLoaderManager().restartLoader(0, null, this);
     }
 
-    public void remove(Starred item) {
-        StarDataSource data = new StarDataSource(getActivity());
-        sItem = item;
+    public void remove(HistoryItem item) {
+        HistoryDataSource data = new HistoryDataSource(getActivity());
+        historyItem = item;
         showSnackBar();
         data.remove(item);
     }
@@ -217,14 +216,14 @@ public class StarredFragment extends Fragment implements
     //Added code to show SnackBar when clicked on Remove button in Favorites screen
     private void showSnackBar() {
         Snackbar snackbar =
-                Snackbar.make(view, getString(R.string.starred_removed), Snackbar.LENGTH_LONG);
-        snackbar.setAction(R.string.starred_removed_undo, new View.OnClickListener() {
+                Snackbar.make(view, getString(R.string.history_removed), Snackbar.LENGTH_LONG);
+        snackbar.setAction(R.string.history_removed_undo, new OnClickListener() {
 
             @Override
             public void onClick(View view) {
-                StarDataSource data = new StarDataSource(getActivity());
-                String bib = app.getLibrary().getIdent();
-                data.star(sItem.getMNr(), sItem.getTitle(), bib, sItem.getMediaType());
+                HistoryDataSource data = new HistoryDataSource(getActivity());
+                // String bib = app.getLibrary().getIdent();
+                data.insertHistoryItem(historyItem);
             }
         });
         snackbar.show();
@@ -234,8 +233,8 @@ public class StarredFragment extends Fragment implements
     public Loader<Cursor> onCreateLoader(int arg0, Bundle arg1) {
         if (app.getLibrary() != null) {
             return new CursorLoader(getActivity(),
-                    app.getStarProviderStarUri(), StarDatabase.COLUMNS,
-                    StarDatabase.STAR_WHERE_LIB, new String[]{app
+                    app.getHistoryProviderHistoryUri(), HistoryDatabase.COLUMNS,
+                    HistoryDatabase.HIST_WHERE_LIB, new String[]{app
                     .getLibrary().getIdent()}, null);
         } else {
             return null;
@@ -258,15 +257,15 @@ public class StarredFragment extends Fragment implements
     }
 
     protected void share() {
-        Intent intent = new Intent(android.content.Intent.ACTION_SEND);
+        Intent intent = new Intent(Intent.ACTION_SEND);
         intent.setType("text/plain");
         intent.addFlags(CompatibilityUtils.getNewDocumentIntentFlag());
 
         StringBuilder text = new StringBuilder();
 
-        StarDataSource data = new StarDataSource(getActivity());
-        List<Starred> items = data.getAllItems(app.getLibrary().getIdent());
-        for (Starred item : items) {
+        HistoryDataSource data = new HistoryDataSource(getActivity());
+        List<HistoryItem> items = data.getAllItems(app.getLibrary().getIdent());
+        for (HistoryItem item : items) {
             text.append(item.getTitle());
             text.append("\n");
             String shareUrl;
@@ -297,15 +296,15 @@ public class StarredFragment extends Fragment implements
             // Create a file with the requested MIME type.
             intent.setType("application/json");
             intent.putExtra(Intent.EXTRA_TITLE,
-                    "webopac_starred_" + app.getLibrary().getIdent() + ".json");
+                    "webopac_history_" + app.getLibrary().getIdent() + ".json");
             startActivityForResult(intent, REQUEST_CODE_EXPORT);
         } else {        // <android 4.4; share json as text
             intent = new Intent();
             intent.setAction(Intent.ACTION_SEND);
             intent.setType("text/plain");
-            intent.putExtra(Intent.EXTRA_TEXT, getEncodedStarredObjects().toString());
+            intent.putExtra(Intent.EXTRA_TEXT, getEncodedHistoryItemObjects().toString());
             Intent chooser =
-                    Intent.createChooser(intent, getString(R.string.export_starred_to_storage));
+                    Intent.createChooser(intent, getString(R.string.export_history_to_storage));
             startActivity(chooser);
         }
     }
@@ -335,25 +334,25 @@ public class StarredFragment extends Fragment implements
                 Snackbar.LENGTH_SHORT).show();
     }
 
-    private JSONObject getEncodedStarredObjects() {
-        JSONObject starred = new JSONObject();
+    private JSONObject getEncodedHistoryItemObjects() {
+        JSONObject history = new JSONObject();
         try {
-            starred.put(JSON_LIBRARY_NAME, app.getLibrary().getIdent());
+            history.put(JSON_LIBRARY_NAME, app.getLibrary().getIdent());
             JSONArray items = new JSONArray();
-            StarDataSource data = new StarDataSource(getActivity());
-            List<Starred> libItems = data.getAllItems(app.getLibrary().getIdent());
-            for (Starred libItem : libItems) {
+            HistoryDataSource data = new HistoryDataSource(getActivity());
+            List<HistoryItem> libItems = data.getAllItems(app.getLibrary().getIdent());
+            for (HistoryItem libItem : libItems) {
                 JSONObject item = new JSONObject();
                 item.put(JSON_ITEM_MNR, libItem.getMNr());
                 item.put(JSON_ITEM_TITLE, libItem.getTitle());
                 item.put(JSON_ITEM_MEDIATYPE, libItem.getMediaType());
                 items.put(item);
             }
-            starred.put(JSON_STARRED_LIST, items);
+            history.put(JSON_HISTORY_LIST, items);
         } catch (JSONException e) {
             showExportError();
         }
-        return starred;
+        return history;
     }
 
     public void importFromStorage() {
@@ -378,14 +377,14 @@ public class StarredFragment extends Fragment implements
     @Override
     public void onActivityResult(int requestCode, int resultCode, Intent data) {
         if (requestCode == REQUEST_CODE_EXPORT && resultCode == Activity.RESULT_OK) {
-            Log.i("StarredFragment", data.toString());
+            Log.i("HistoryItemFragment", data.toString());
             Uri uri = data.getData();
             try {
                 OutputStream os = getActivity().getContentResolver().openOutputStream(uri);
                 if (os != null) {
-                    JSONObject starred = getEncodedStarredObjects();
+                    JSONObject history = getEncodedHistoryItemObjects();
                     PrintWriter pw = new PrintWriter(os, true);
-                    pw.write(starred.toString());
+                    pw.write(history.toString());
                     pw.close();
                     os.close();
                 } else {
@@ -400,7 +399,7 @@ public class StarredFragment extends Fragment implements
             Uri uri = data.getData();
             InputStream is = null;
             try {
-                StarDataSource dataSource = new StarDataSource(getActivity());
+                HistoryDataSource dataSource = new HistoryDataSource(getActivity());
                 is = getActivity().getContentResolver().openInputStream(uri);
                 if (is != null) {
                     BufferedReader reader = new BufferedReader(new InputStreamReader(is, "UTF-8"));
@@ -427,22 +426,24 @@ public class StarredFragment extends Fragment implements
                                 Snackbar.LENGTH_SHORT).show();
                         return;
                     }
-                    JSONArray items = savedList.getJSONArray(JSON_STARRED_LIST);
+                    JSONArray items = savedList.getJSONArray(JSON_HISTORY_LIST);
                     for (int i = 0; i < items.length(); i++) {
                         JSONObject entry = items.getJSONObject(i);
                         if (entry.has(JSON_ITEM_MNR) &&
-                                !dataSource.isStarred(bib, entry.getString(JSON_ITEM_MNR)) ||
-                                !entry.has(JSON_ITEM_MNR) && !dataSource.isStarredTitle(bib,
+                                !dataSource.isHistory(bib, entry.getString(JSON_ITEM_MNR)) ||
+                                !entry.has(JSON_ITEM_MNR) && !dataSource.isHistoryTitle(bib,
                                         entry.getString(JSON_ITEM_TITLE))) { //disallow dupes
                             String mediatype = entry.optString(JSON_ITEM_MEDIATYPE, null);
-                            dataSource.star(entry.optString(JSON_ITEM_MNR),
+                            /* TODO import
+                            dataSource.historize(entry.optString(JSON_ITEM_MNR),
                                     entry.getString(JSON_ITEM_TITLE), bib,
                                     mediatype != null ? SearchResult.MediaType.valueOf(mediatype) :
                                             null);
+                             */
                         }
                     }
                     adapter.notifyDataSetChanged();
-                    Snackbar.make(getView(), R.string.info_starred_updated,
+                    Snackbar.make(getView(), R.string.info_history_updated,
                             Snackbar.LENGTH_SHORT).show();
                 } else {
                     showImportError();
@@ -464,19 +465,19 @@ public class StarredFragment extends Fragment implements
     }
 
     @Override
-    public void onAttach(Context context) {
-        super.onAttach(context);
+    public void onAttach(Activity activity) {
+        super.onAttach(activity);
         try {
-            callback = (Callback) context;
+            callback = (Callback) activity;
         } catch (ClassCastException e) {
-            throw new ClassCastException(context.toString()
-                    + " must implement StarredFragment.Callback");
+            throw new ClassCastException(activity.toString()
+                    + " must implement HistoryFragment.Callback");
         }
     }
 
     @Override
     public void onResume() {
-        LoaderManager.getInstance(this).restartLoader(0, null, this);
+        getActivity().getSupportLoaderManager().restartLoader(0, null, this);
         super.onResume();
     }
 
@@ -519,13 +520,13 @@ public class StarredFragment extends Fragment implements
     private class ItemListAdapter extends SimpleCursorAdapter {
 
         public ItemListAdapter() {
-            super(getActivity(), R.layout.listitem_starred, null,
+            super(getActivity(), R.layout.listitem_history, null,
                     new String[]{"bib"}, null, 0);
         }
 
         @Override
         public void bindView(View view, Context context, Cursor cursor) {
-            Starred item = StarDataSource.cursorToItem(cursor);
+            HistoryItem item = HistoryDataSource.cursorToItem(cursor);
 
             TextView tv = (TextView) view.findViewById(R.id.tvTitle);
             if (item.getTitle() != null) {
@@ -548,7 +549,7 @@ public class StarredFragment extends Fragment implements
             ivDelete.setOnClickListener(new OnClickListener() {
                 @Override
                 public void onClick(View arg0) {
-                    Starred item = (Starred) arg0.getTag();
+                    HistoryItem item = (HistoryItem) arg0.getTag();
                     remove(item);
                     callback.removeFragment();
                 }
