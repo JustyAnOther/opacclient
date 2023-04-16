@@ -4,14 +4,16 @@ package de.geeksfactory.opacclient.storage;
  * Branch-data for a stared media-item
  */
 public class Branch {
+
     /**
      * unique db-row-id
      */
     private int id;
+
     /**
      * Branch name
      */
-    private String branch;
+    private String name;
 
     /**
      * count media-items starred in this brach
@@ -19,7 +21,13 @@ public class Branch {
     private int count;
 
     /**
-     * lastest timestamp this branch was used for filtering
+     * minimal (oldest) statusTime off all starred items in this branch
+     */
+    private long minStatusTime;
+
+    /**
+     * most recent timestamp this branch was used for filtering.
+     * Used for LRU-sortorder of filter menu items
      */
     private int filtertimestamp;
 
@@ -31,12 +39,12 @@ public class Branch {
         this.id = id;
     }
 
-    public String getBranch() {
-        return branch;
+    public String getName() {
+        return name;
     }
 
-    public void setBranch(String branch) {
-        this.branch = branch;
+    public void setName(String name) {
+        this.name = name;
     }
 
     public int getCount() {
@@ -53,5 +61,13 @@ public class Branch {
 
     public void setFiltertimestamp(int filtertimestamp) {
         this.filtertimestamp = filtertimestamp;
+    }
+
+    public long getMinStatusTime() {
+        return minStatusTime;
+    }
+
+    public void setMinStatusTime(long minStatusTime) {
+        this.minStatusTime = minStatusTime;
     }
 }

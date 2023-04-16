@@ -377,6 +377,30 @@
     <string name="support_policy_hint">We provide no free support for use of this library in the
         app, problems that may occur in the future will probably not be fixed.</string>
     <string name="support_policy_more_info">more info</string>
+    <string name="starred_refresh_branches">Refresh status</string>
+    <string name="starred_filter_no_branch">Without Branch</string>
+    <string name="starred_header_branch">%1$d items in %2$s</string>
+    <string name="starred_header">%1d items</string>
+    <string name="starred_remove_all">Remove all</string>
+    <string name="starred_remove_all_sure">Remove all?</string>
+    <string name="starred_remove_all_ok">Yes</string>
+    <string name="starred_update_branch_success">Update branches for %1$d items</string>
+    <string name="starred_update_branch_fail">Update branches failed %1$s</string>
+    <string name="starred_filter_all">All</string>
+    <string name="starred_without_branch">%1d item without brach</string>
+    <string name="starred_up_to_date">The status is up-to-date.</string>
+    <plurals name="starred_age_minutes">
+        <item quantity="one">The status is one minute old.</item>
+        <item quantity="other">The is status is %d minutes old.</item>
+    </plurals>
+    <plurals name="starred_age_hours">
+        <item quantity="one">The status is one hour old.</item>
+        <item quantity="other">The status is %d hours old.</item>
+    </plurals>
+    <plurals name="starred_age_days">
+        <item quantity="one">The status is one day old.</item>
+        <item quantity="other">The status is %d days old.</item>
+    </plurals>
     <string name="prolong_due">Renew due items</string>
     <string name="prolong_due_confirm">Really renew all due items? In some libraries this might cause fees.</string>
     <string name="doing_prolong_due">Renewable due media are being renewed…</string>

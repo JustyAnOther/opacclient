@@ -153,6 +153,10 @@ public class StarContentProvider extends ContentProvider {
                 rowsAffected = deleteInDatabase(StarDatabase.STAR_TABLE,
                         StarDatabase.STAR_WHERE_ID, selectionForUri(uri));
                 break;
+            case STAR_BRANCH_DIR:
+                rowsAffected = deleteInDatabase(StarDatabase.STAR_BRANCH_TABLE,
+                        selection, selectionArgs);
+                break;
             case STAR_BRANCH_ITEM:
                 rowsAffected = deleteInDatabase(StarDatabase.STAR_BRANCH_TABLE,
                         "id = ?", selectionForUri(uri));
@@ -235,15 +239,15 @@ public class StarContentProvider extends ContentProvider {
                                 + StarDatabase.BRANCH_TABLE + ".id = "
                                 + StarDatabase.STAR_BRANCH_TABLE + ".id_branch"
                         , projection,
-                        selection, selectionArgs, "branch", "count >0", sortOrder);
+                        selection, selectionArgs, "name", "count >0", sortOrder);
                 break;
             case STAR_JOIN_STAR_BRANCH_DIR:
-                cursor = queryDatabase(StarDatabase.STAR_TABLE + " INNER JOIN "
+                cursor = queryDatabase(StarDatabase.STAR_TABLE + " LEFT JOIN "
                                 + StarDatabase.STAR_BRANCH_TABLE + " ON "
                                 + StarDatabase.STAR_TABLE + ".id = "
                                 + StarDatabase.STAR_BRANCH_TABLE + ".id_star"
                         , projection,
-                        selection, selectionArgs, null, null, sortOrder);
+                        selection, selectionArgs, "starred.id", null, sortOrder);
                 break;
             default:
                 return null;
