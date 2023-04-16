@@ -613,6 +613,7 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
         this.data = library.getData();
         try {
             this.opac_url = data.getString("baseurl");
+            logInfo("%s - this.opac_url = %s", "init", this.opac_url);
         } catch (JSONException e) {
             throw new RuntimeException(e);
         }
@@ -1391,6 +1392,7 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
             doc = htmlGet(opac_url + ";jsessionid=" + s_sid + "?service="
                     + s_service + getSpParams("SBK"));
         } else {
+            logInfo("%s - url %s, jessionid %s", "login", opac_url, s_sid);
             doc = htmlPost(opac_url + ";jsessionid=" + s_sid, accountFormBody);
         }
         doc = handleLoginForm(doc, account);

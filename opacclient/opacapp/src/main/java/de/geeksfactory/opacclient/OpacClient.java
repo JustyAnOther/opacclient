@@ -48,10 +48,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
 import androidx.multidex.MultiDex;
+import de.geeksfactory.opacclient.apis.Adis;
 import androidx.preference.PreferenceManager;
 import de.geeksfactory.opacclient.apis.OpacApi;
 import de.geeksfactory.opacclient.frontend.AccountListActivity;
@@ -82,6 +85,8 @@ import io.sentry.android.core.SentryAndroid;
 import io.sentry.core.Sentry;
 
 public class OpacClient extends Application {
+
+    private static final Logger LOGGER = Logger.getLogger(OpacClient.class.getName());
 
     public static final String PREF_SELECTED_ACCOUNT = "selectedAccount";
     public static final String PREF_HOME_BRANCH_PREFIX = "homeBranch_";
@@ -281,21 +286,44 @@ public class OpacClient extends Application {
     }
 
     public Library getLibrary(String ident) throws IOException, JSONException {
+
+        final String methodName = "getLibrary";
+
         String filename = ident + ".json";
-        String json;
 
         File filesDir = getLibrariesDir();
+        LOGGER.log(Level.INFO, String.format("%s - filesDir %s, fileName %s"
+                , methodName, filesDir, filename));
         PreferenceDataSource prefs = getPreferenceDataSource();
 
+        if (prefs.hasBundledConfiguration()) {
+            LOGGER.log(Level.INFO, String.format("%s - prefs.lastLibraryConfigUpdateVersion = %s"
+                    , methodName, prefs.getLastLibraryConfigUpdateVersion()));
+        }
+
+        String json;
         if (fileExists(filesDir, filename) && (
                 !prefs.hasBundledConfiguration() ||
                         prefs.getLastLibraryConfigUpdateVersion() == BuildConfig.VERSION_CODE)) {
             // only use files if they were downloaded using the current app version
+            LOGGER.log(Level.INFO, String.format("%s - filesDir %s, fileName %s"
+                    , methodName, filesDir, filename));
             json = Utils.readStreamToString(openFile(filesDir, filename));
         } else {
+            LOGGER.log(Level.INFO, String.format("%s - ASSETS_BIBSDIR %s, fileName %s"
+                    , methodName, ASSETS_BIBSDIR, filename));
             json = Utils.readStreamToString(getAssets().open(ASSETS_BIBSDIR + "/" + filename));
         }
-        return Library.fromJSON(ident, new JSONObject(json));
+        JSONObject jsonObject = new JSONObject(json);
+        JSONObject jsonData = jsonObject.getJSONObject("data");
+        if (jsonData.has("baseurl")) {
+            String baseurl = jsonData.getString("baseurl");
+            LOGGER.log(Level.INFO, String.format("%s - baseurl = %s", methodName, baseurl));
+        } else {
+            LOGGER.log(Level.INFO, String.format("%s - baseurl not set. json = %s"
+                    , methodName, json));
+        }
+        return Library.fromJSON(ident, jsonObject);
     }
 
     @NonNull
