@@ -1,29 +1,27 @@
 /**
  * Copyright (C) 2013 by Raphael Michel under the MIT license:
  * <p>
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"),
- * to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense,
- * and/or sell copies of the Software, and to permit persons to whom the Software
- * is furnished to do so, subject to the following conditions:
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
+ * associated documentation files (the "Software"), to deal in the Software without restriction,
+ * including without limitation the rights to use, copy, modify, merge, publish, distribute,
+ * sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  * <p>
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
+ * The above copyright notice and this permission notice shall be included in all copies or
+ * substantial portions of the Software.
  * <p>
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
- * IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
- * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
- * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
- * DEALINGS IN THE SOFTWARE.
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT
+ * NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+ * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 package de.geeksfactory.opacclient.frontend;
 
 import android.app.Activity;
 import android.content.ActivityNotFoundException;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.database.Cursor;
@@ -70,6 +68,7 @@ import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.List;
 
+import androidx.appcompat.app.AlertDialog;
 import androidx.core.app.ActivityCompat;
 import androidx.core.app.ActivityOptionsCompat;
 import androidx.cursoradapter.widget.SimpleCursorAdapter;
@@ -80,15 +79,14 @@ import androidx.loader.content.Loader;
 import de.geeksfactory.opacclient.OpacClient;
 import de.geeksfactory.opacclient.R;
 import de.geeksfactory.opacclient.frontend.OpacActivity.AccountSelectedListener;
-import de.geeksfactory.opacclient.frontend.adapter.AccountAdapter;
 import de.geeksfactory.opacclient.objects.Account;
 import de.geeksfactory.opacclient.objects.AccountItem;
-import de.geeksfactory.opacclient.objects.HistoryItem;
 import de.geeksfactory.opacclient.searchfields.SearchField;
 import de.geeksfactory.opacclient.searchfields.SearchField.Meaning;
 import de.geeksfactory.opacclient.searchfields.SearchQuery;
 import de.geeksfactory.opacclient.storage.HistoryDataSource;
 import de.geeksfactory.opacclient.storage.HistoryDatabase;
+import de.geeksfactory.opacclient.storage.HistoryItem;
 import de.geeksfactory.opacclient.storage.JsonSearchFieldDataSource;
 import de.geeksfactory.opacclient.utils.CompatibilityUtils;
 
@@ -96,12 +94,16 @@ public class HistoryFragment extends Fragment implements
         LoaderCallbacks<Cursor>, AccountSelectedListener {
 
     private static final String STATE_ACTIVATED_POSITION = "activated_position";
+    private static final String STATE_SORT_DIRECTION = "sort_direction";
+    private static final String STATE_SORT_OPTION = "sort_option";
+
     private static final String JSON_LIBRARY_NAME = "library_name";
     private static final String JSON_HISTORY_LIST = "history_list";
     private static final int REQUEST_CODE_EXPORT = 123;
     private static final int REQUEST_CODE_IMPORT = 124;
 
     private static int REQUEST_CODE_DETAIL = 1; // siehe AccountFragment.REQUEST_DETAIL
+    private static int LOADER_ID = 1; // !=0 wie bei Star
 
     protected View view;
     protected OpacClient app;
@@ -110,9 +112,79 @@ public class HistoryFragment extends Fragment implements
     private ListView listView;
     private int activatedPosition = ListView.INVALID_POSITION;
     private TextView tvWelcome;
+    private TextView tvHistoryHeader;
     private HistoryItem historyItem;
 
-    private String sortOrder = null;
+    private boolean showMediatype = true;
+    private boolean showCover = true;
+
+    private enum EnumSortDirection {
+
+        DESC("DESC", R.string.sort_direction_desc), ASC("ASC", R.string.sort_direction_asc);
+
+        final String sqlText;
+        final int textId;
+
+        private EnumSortDirection(String sqlText, int textId) {
+            this.sqlText = sqlText;
+            this.textId = textId;
+        }
+
+        public EnumSortDirection swap() {
+            if (this == ASC) {
+                return DESC;
+            } else {
+                return ASC;
+            }
+        }
+    }
+
+    EnumSortDirection currentSortDirection = null;
+
+    private enum EnumSortOption {
+
+        AUTOR(R.id.action_sort_author, R.string.sort_history_author,
+                HistoryDatabase.HIST_COL_AUTHOR, EnumSortDirection.ASC),
+        TITLE(R.id.action_sort_title, R.string.sort_history_title, HistoryDatabase.HIST_COL_TITLE,
+                EnumSortDirection.ASC),
+        FIRST_DATE(R.id.action_sort_firstDate, R.string.sort_history_firstDate,
+                HistoryDatabase.HIST_COL_FIRST_DATE),
+        LAST_DATE(R.id.action_sort_lastDate, R.string.sort_history_lastDate,
+                HistoryDatabase.HIST_COL_LAST_DATE),
+        PROLONG_COUNT(R.id.action_sort_prolongCount, R.string.sort_history_prolongCount,
+                HistoryDatabase.HIST_COL_PROLONG_COUNT),
+        DURATION(R.id.action_sort_duration, R.string.sort_history_duration,
+                "julianday(lastDate) - julianday(firstDate)");
+
+        final int menuId;
+        final int textId;
+        final String column;
+        final EnumSortDirection initialSortDirection;
+
+        private EnumSortOption(int menuId, int textId, String column) {
+            // SortDirection Default ist DESC
+            this(menuId, textId, column, EnumSortDirection.DESC);
+        }
+
+        private EnumSortOption(int menuId, int textId, String column,
+                EnumSortDirection sortDirection) {
+            this.menuId = menuId;
+            this.textId = textId;
+            this.column = column;
+            this.initialSortDirection = sortDirection;
+        }
+
+        public static EnumSortOption fromMenuId(int menuId) {
+            for (EnumSortOption value : EnumSortOption.values()) {
+                if (value.menuId == menuId) {
+                    return value;
+                }
+            }
+            return null;
+        }
+    }
+
+    private EnumSortOption currentSortOption = null;
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
@@ -127,15 +199,16 @@ public class HistoryFragment extends Fragment implements
 
         listView = (ListView) view.findViewById(R.id.lvHistory);
         tvWelcome = (TextView) view.findViewById(R.id.tvHistoryWelcome);
+        tvHistoryHeader = (TextView) view.findViewById(R.id.tvHistoryHeader);
 
         listView.setOnItemClickListener(new OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> parent, View view,
                     int position, long id) {
                 HistoryItem item = (HistoryItem) view.findViewById(R.id.ivDelete)
-                                             .getTag();
-                if (item.getMNr() == null || item.getMNr().equals("null")
-                        || item.getMNr().equals("")) {
+                                                     .getTag();
+                if (item.getId() == null || item.getId().equals("null")
+                        || item.getId().equals("")) {
 
                     SharedPreferences sp = PreferenceManager
                             .getDefaultSharedPreferences(getActivity());
@@ -170,6 +243,7 @@ public class HistoryFragment extends Fragment implements
                     }
                 } else {
 //                  callback.showDetail(item.getMNr());
+                    item.setStatus(null);
                     showDetailActivity(item, view);
                 }
             }
@@ -178,19 +252,49 @@ public class HistoryFragment extends Fragment implements
         listView.setTextFilterEnabled(true);
 
         getActivity().getSupportLoaderManager()
-                     .initLoader(0, null, this);
+                     .initLoader(LOADER_ID, null, this);
         listView.setAdapter(adapter);
 
-        // Restore the previously serialized activated item position.
-        if (savedInstanceState != null
-                && savedInstanceState.containsKey(STATE_ACTIVATED_POSITION)) {
-            setActivatedPosition(savedInstanceState
-                    .getInt(STATE_ACTIVATED_POSITION));
+        if (savedInstanceState != null) {
+            // Restore the previously serialized activated item position.
+            if (savedInstanceState.containsKey(STATE_ACTIVATED_POSITION)) {
+                setActivatedPosition(savedInstanceState
+                        .getInt(STATE_ACTIVATED_POSITION));
+            }
+
+            // Restore the previously serialized sorting of the items
+            if (savedInstanceState.containsKey(STATE_SORT_DIRECTION)) {
+                currentSortDirection = EnumSortDirection.valueOf(savedInstanceState
+                        .getString(STATE_SORT_DIRECTION));
+            }
+            if (savedInstanceState.containsKey(STATE_SORT_OPTION)) {
+                currentSortOption = EnumSortOption.valueOf(savedInstanceState
+                        .getString(STATE_SORT_OPTION));
+            }
         }
 
         setActivateOnItemClick(((OpacActivity) getActivity()).isTablet());
 
         return view;
+    }
+
+    private void updateHeader() {
+        // getString needs context
+        if (getContext() == null) {
+            return;
+        }
+
+        String text = null;
+        int countItems = adapter.getCount();
+        if (currentSortOption == null) {
+            text = getString(R.string.history_header, countItems);
+        } else {
+            String sortColumnText = getString(currentSortOption.textId);
+            String sortDirectionText = getString(currentSortDirection.textId);
+            text = getString(R.string.history_header_sort, countItems,
+                    sortColumnText, sortDirectionText);
+        }
+        tvHistoryHeader.setText(text);
     }
 
     private void showDetailActivity(AccountItem item, View view) {
@@ -201,7 +305,8 @@ public class HistoryFragment extends Fragment implements
                         getString(R.string.transition_background));
 
         ActivityCompat
-                .startActivityForResult(getActivity(), intent, REQUEST_CODE_DETAIL, options.toBundle());
+                .startActivityForResult(getActivity(), intent, REQUEST_CODE_DETAIL,
+                        options.toBundle());
     }
 
     @Override
@@ -222,54 +327,40 @@ public class HistoryFragment extends Fragment implements
         } else if (item.getItemId() == R.id.action_import_from_storage) {
             importFromStorage();
             return true;
-        } else if (item.getItemId() == R.id.action_sort_author) {
-            sort("author");
+        } else if (item.getItemId() == R.id.action_remove_all) {
+            removeAll();
             return true;
-        } else if (item.getItemId() == R.id.action_sort_title) {
-            sort("title");
-            return true;
-        } else if (item.getItemId() == R.id.action_sort_firstDate) {
-            sort("firstDate");
-            return true;
-        } else if (item.getItemId() == R.id.action_sort_lastDate) {
-            sort("lastDate");
-            return true;
-        } else if (item.getItemId() == R.id.action_sort_prolongCount) {
-            sort("prolongCount");
-            return true;
-        } else if (item.getItemId() == R.id.action_sort_duration) {
-            sort("julianday(lastDate) - julianday(firstDate)");
-            return true;
+        } else {
+            EnumSortOption sortOption = EnumSortOption.fromMenuId(item.getItemId());
+            if (sortOption != null) {
+                sort(sortOption);
+                return true;
+            }
         }
         return super.onOptionsItemSelected(item);
     }
 
-    private void sort(String orderby) {
+    private void sort(EnumSortOption sortOption) {
 
-        if (sortOrder == null) {
-            // bisher nicht sortiert
-            sortOrder = orderby + " DESC";
-        } else if (sortOrder.startsWith(orderby)) {
+        if (currentSortOption == sortOption) {
             // bereits nach dieser Spalte sortiert
             // d.h. ASC/DESC swappen
-            if (sortOrder.equals(orderby + " ASC")) {
-                sortOrder = orderby + " DESC";
-            } else {
-                sortOrder = orderby + " ASC";
-            }
+            currentSortDirection = currentSortDirection.swap();
         } else {
-            // bisher nach anderer Spalte sortiert
-            // zunächst ASC
-            sortOrder = orderby + " ASC";
+            currentSortOption = sortOption;
+            currentSortDirection = sortOption.initialSortDirection;
         }
 
         // Loader restarten
-        getActivity().getSupportLoaderManager().restartLoader(0, null, this);
+        getActivity().getSupportLoaderManager().restartLoader(LOADER_ID, null, this);
+
+        // Header aktualisieren
+        // updateHeader(); unnötig, wird via onLoadFinished aufgerufen
     }
 
     @Override
     public void accountSelected(Account account) {
-        getActivity().getSupportLoaderManager().restartLoader(0, null, this);
+        getActivity().getSupportLoaderManager().restartLoader(LOADER_ID, null, this);
     }
 
     public void remove(HistoryItem item) {
@@ -277,6 +368,33 @@ public class HistoryFragment extends Fragment implements
         historyItem = item;
         showSnackBar();
         data.remove(item);
+    }
+
+    public void removeAll() {
+        DialogInterface.OnClickListener dialogClickListener =
+                new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        switch (which) {
+                            case DialogInterface.BUTTON_POSITIVE:
+                                // Yes button clicked
+                                HistoryDataSource data = new HistoryDataSource(getActivity());
+                                String bib = app.getLibrary().getIdent();
+                                data.removeAll(bib);
+                                break;
+
+                            case DialogInterface.BUTTON_NEGATIVE:
+                                // No button clicked
+                                break;
+                        }
+                    }
+                };
+        AlertDialog.Builder builder = new AlertDialog.Builder(
+                getActivity());
+        builder.setMessage(R.string.history_remove_all_sure)
+               .setPositiveButton(R.string.yes, dialogClickListener)
+               .setNegativeButton(R.string.no, dialogClickListener)
+               .show();
     }
 
     //Added code to show SnackBar when clicked on Remove button in Favorites screen
@@ -298,6 +416,16 @@ public class HistoryFragment extends Fragment implements
     @Override
     public Loader<Cursor> onCreateLoader(int arg0, Bundle arg1) {
         if (app.getLibrary() != null) {
+            String sortOrder = null;
+            if (currentSortOption != null) {
+                sortOrder = currentSortOption.column + " " + currentSortDirection.sqlText;
+            }
+
+            HistoryDataSource data = new HistoryDataSource(getActivity());
+            showMediatype = (data.getCountItemsWithMediatype() > 0);
+            showCover = (data.getCountItemsWithCover() > 0);
+            // Hinweis: listitem_history_item ivCover.visibility default ist GONE
+
             return new CursorLoader(getActivity(),
                     app.getHistoryProviderHistoryUri(), HistoryDatabase.COLUMNS,
                     HistoryDatabase.HIST_WHERE_LIB, new String[]{app
@@ -314,6 +442,7 @@ public class HistoryFragment extends Fragment implements
             tvWelcome.setVisibility(View.VISIBLE);
         } else {
             tvWelcome.setVisibility(View.GONE);
+            updateHeader();
         }
     }
 
@@ -336,7 +465,7 @@ public class HistoryFragment extends Fragment implements
             text.append("\n");
             String shareUrl;
             try {
-                shareUrl = app.getApi().getShareUrl(item.getMNr(),
+                shareUrl = app.getApi().getShareUrl(item.getId(),
                         item.getTitle());
             } catch (OpacClient.LibraryRemovedException e) {
                 return;
@@ -504,14 +633,19 @@ public class HistoryFragment extends Fragment implements
                         JSONObject entry = items.getJSONObject(i);
                         HistoryDataSource.ChangeType ct = dataSource.insertOrUpdate(bib, entry);
                         switch (ct) {
-                            case UPDATE: countUpdate++; break;
-                            case INSERT: countInsert++; break;
+                            case UPDATE:
+                                countUpdate++;
+                                break;
+                            case INSERT:
+                                countInsert++;
+                                break;
                         }
                     }
-                    if(countInsert>0 || countUpdate>0) {
+                    if (countInsert > 0 || countUpdate > 0) {
                         adapter.notifyDataSetChanged();
                         Snackbar.make(getView(),
-                                getString(R.string.info_history_updated_count, countInsert, countUpdate),
+                                getString(R.string.info_history_updated_count, countInsert,
+                                        countUpdate),
                                 Snackbar.LENGTH_LONG).show();
                     } else {
                         Snackbar.make(getView(), R.string.info_history_updated,
@@ -560,7 +694,7 @@ public class HistoryFragment extends Fragment implements
 
     @Override
     public void onResume() {
-        getActivity().getSupportLoaderManager().restartLoader(0, null, this);
+        getActivity().getSupportLoaderManager().restartLoader(LOADER_ID, null, this);
         super.onResume();
     }
 
@@ -592,6 +726,13 @@ public class HistoryFragment extends Fragment implements
             // Serialize and persist the activated item position.
             outState.putInt(STATE_ACTIVATED_POSITION, activatedPosition);
         }
+
+        if (currentSortDirection != null) {
+            outState.putString(STATE_SORT_DIRECTION, currentSortDirection.name());
+        }
+        if (currentSortOption != null) {
+            outState.putString(STATE_SORT_OPTION, currentSortOption.name());
+        }
     }
 
     public interface Callback {
@@ -622,7 +763,7 @@ public class HistoryFragment extends Fragment implements
                 if (!TextUtils.isEmpty(item.getAuthor())) builder.append(". ");
             }
             if (!TextUtils.isEmpty(item.getAuthor())) {
-                builder.append(item.getAuthor().split("¬\\[",2)[0]);
+                builder.append(item.getAuthor().split("¬\\[", 2)[0]);
             }
             setTextOrHide(builder, tvTitleAndAuthor);
             // statt von StarFragment
@@ -633,6 +774,22 @@ public class HistoryFragment extends Fragment implements
                 tvTitleAndAuthor.setText("");
             }
             */
+
+            // Spalte Cover ausblenden, wenn alle HistoryItems ohne MediaType sind
+            ImageView ivCover = (ImageView) view.findViewById(R.id.ivCover);
+            if ( showCover ) {
+                ivCover.setVisibility(View.VISIBLE);
+            } else {
+                ivCover.setVisibility(View.GONE);
+            }
+
+            // Spalte Mediatype ausblenden, wenn alle HistoryItems ohne MediaType sind
+            ImageView ivMediaType = (ImageView) view.findViewById(R.id.ivMediaType);
+            if ( showMediatype ) {
+                ivMediaType.setVisibility(View.VISIBLE);
+            } else {
+                ivMediaType.setVisibility(View.GONE);
+            }
 
             TextView tvStatus = (TextView) view.findViewById(R.id.tvStatus);
             TextView tvBranch = (TextView) view.findViewById(R.id.tvBranch);
@@ -659,9 +816,11 @@ public class HistoryFragment extends Fragment implements
                 int resId = 0;
                 String fmtFirstDate = fmt.print(item.getFirstDate());
                 if (countDays == 1) {
-                    resId = item.isLending() ?  R.string.history_status_lending_1 : R.string.history_status_finished_1;
+                    resId = item.isLending() ? R.string.history_status_lending_1 :
+                            R.string.history_status_finished_1;
                 } else {
-                    resId = item.isLending() ?  R.string.history_status_lending : R.string.history_status_finished;
+                    resId = item.isLending() ? R.string.history_status_lending :
+                            R.string.history_status_finished;
                 }
                 status = getString(resId, fmtFirstDate, countDays);
                 setTextOrHide(status, tvStatus);
@@ -672,24 +831,26 @@ public class HistoryFragment extends Fragment implements
                 setTextOrHide(Html.fromHtml(item.getHomeBranch()), tvBranch);
             }
 
-            tvBranch.getViewTreeObserver().addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener() {
-                @Override
-                public boolean onPreDraw () {
-                    tvBranch.getViewTreeObserver().removeOnPreDrawListener(this);
-                    // place tvBranch next to or below tvStatus to prevent overlapping
-                    RelativeLayout.LayoutParams lp = (RelativeLayout.LayoutParams)tvBranch.getLayoutParams();
-                    if (tvStatus.getPaint().measureText(tvStatus.getText().toString()) <
-                            tvStatus.getWidth() / 2 - 4){
-                        lp.addRule(RelativeLayout.BELOW, 0);  //removeRule only since API 17
-                        lp.addRule(RelativeLayout.ALIGN_PARENT_TOP);
-                    } else {
-                        lp.addRule(RelativeLayout.ALIGN_PARENT_TOP,0);
-                        lp.addRule(RelativeLayout.BELOW, R.id.tvStatus);
-                    }
-                    tvBranch.setLayoutParams(lp);
-                    return true;
-                }
-            });
+            tvBranch.getViewTreeObserver()
+                    .addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener() {
+                        @Override
+                        public boolean onPreDraw() {
+                            tvBranch.getViewTreeObserver().removeOnPreDrawListener(this);
+                            // place tvBranch next to or below tvStatus to prevent overlapping
+                            RelativeLayout.LayoutParams lp =
+                                    (RelativeLayout.LayoutParams) tvBranch.getLayoutParams();
+                            if (tvStatus.getPaint().measureText(tvStatus.getText().toString()) <
+                                    tvStatus.getWidth() / 2 - 4) {
+                                lp.addRule(RelativeLayout.BELOW, 0);  //removeRule only since API 17
+                                lp.addRule(RelativeLayout.ALIGN_PARENT_TOP);
+                            } else {
+                                lp.addRule(RelativeLayout.ALIGN_PARENT_TOP, 0);
+                                lp.addRule(RelativeLayout.BELOW, R.id.tvStatus);
+                            }
+                            tvBranch.setLayoutParams(lp);
+                            return true;
+                        }
+                    });
 
             ImageView ivType = (ImageView) view.findViewById(R.id.ivMediaType);
             if (item.getMediaType() != null) {
@@ -699,17 +860,19 @@ public class HistoryFragment extends Fragment implements
             }
 
             ImageView ivDelete = (ImageView) view.findViewById(R.id.ivDelete);
-            ivDelete.setFocusableInTouchMode(false);
-            ivDelete.setFocusable(false);
-            ivDelete.setTag(item);
-            ivDelete.setOnClickListener(new OnClickListener() {
-                @Override
-                public void onClick(View arg0) {
-                    HistoryItem item = (HistoryItem) arg0.getTag();
-                    remove(item);
-                    callback.removeFragment();
-                }
-            });
+            if (ivDelete != null) {
+                ivDelete.setFocusableInTouchMode(false);
+                ivDelete.setFocusable(false);
+                ivDelete.setTag(item);
+                ivDelete.setOnClickListener(new OnClickListener() {
+                    @Override
+                    public void onClick(View arg0) {
+                        HistoryItem item = (HistoryItem) arg0.getTag();
+                        remove(item);
+                        callback.removeFragment();
+                    }
+                });
+            }
         }
     }
 

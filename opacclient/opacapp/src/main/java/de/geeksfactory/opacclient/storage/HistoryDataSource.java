@@ -1,23 +1,20 @@
 /**
  * Copyright (C) 2013 by Raphael Michel under the MIT license:
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), 
- * to deal in the Software without restriction, including without limitation 
- * the rights to use, copy, modify, merge, publish, distribute, sublicense, 
- * and/or sell copies of the Software, and to permit persons to whom the Software 
- * is furnished to do so, subject to the following conditions:
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
+ * associated documentation files (the "Software"), to deal in the Software without restriction,
+ * including without limitation the rights to use, copy, modify, merge, publish, distribute,
+ * sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- * The above copyright notice and this permission notice shall be included in 
- * all copies or substantial portions of the Software.
+ * The above copyright notice and this permission notice shall be included in all copies or
+ * substantial portions of the Software.
  *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. 
- * IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, 
- * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, 
- * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER 
- * DEALINGS IN THE SOFTWARE.
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT
+ * NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+ * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 package de.geeksfactory.opacclient.storage;
 
@@ -25,8 +22,7 @@ import android.app.Activity;
 import android.content.ContentValues;
 import android.content.Context;
 import android.database.Cursor;
-import android.database.sqlite.SQLiteDatabase;
-import android.text.BoringLayout;
+import android.net.Uri;
 import android.util.Log;
 
 import org.joda.time.LocalDate;
@@ -34,7 +30,6 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -47,22 +42,24 @@ import de.geeksfactory.opacclient.objects.AccountData;
 import de.geeksfactory.opacclient.objects.AccountItem;
 import de.geeksfactory.opacclient.objects.LentItem;
 import de.geeksfactory.opacclient.objects.SearchResult;
-import de.geeksfactory.opacclient.objects.HistoryItem;
 
 public class HistoryDataSource {
 
-    // Database fields
-    private SQLiteDatabase database;
-    private String[] allColumns = HistoryDatabase.COLUMNS;
+    public enum ChangeType {NOTHING, UPDATE, INSERT}
 
-    public enum ChangeType { NOTHING, UPDATE, INSERT};
+    final private Context context;
+    final private Uri historyProviderUri;
 
-    private Activity context;
-    public HistoryDataSource(Activity context) {
-        this.context = context;
+    public HistoryDataSource(Activity activity) {
+        this(activity, (OpacClient) activity.getApplication());
     }
 
-    public void updateLenting(Account account, AccountData adata) {
+    public HistoryDataSource(Context context, OpacClient app) {
+        this.context = context;
+        historyProviderUri = app.getHistoryProviderHistoryUri();
+    }
+
+    public void updateLending(Account account, AccountData adata) {
         String library = account.getLibrary();
 
         /*   Account   yes      /   no
@@ -78,7 +75,7 @@ public class HistoryDataSource {
         List<HistoryItem> historyItems = getAllLendingItems(account.getLibrary());
         for (LentItem lentItem : adata.getLent()) {
             HistoryItem foundItem = null;
-            for (HistoryItem historyItem: historyItems ) {
+            for (HistoryItem historyItem : historyItems) {
                 if (historyItem.isSameAsLentItem(lentItem)) {
                     foundItem = historyItem;
                     break;
@@ -104,7 +101,7 @@ public class HistoryDataSource {
             }
         }
 
-        for (HistoryItem historyItem: historyItems ) {
+        for (HistoryItem historyItem : historyItems) {
             boolean isLending = false;
             for (LentItem lentItem : adata.getLent()) {
                 if (historyItem.isSameAsLentItem(lentItem)) {
@@ -118,6 +115,7 @@ public class HistoryDataSource {
                 // nicht mehr ausgeliehen
                 // -> update lending = false
                 historyItem.setLending(false);
+                historyItem.setStatus(null);
                 this.updateHistoryItem(historyItem);
             }
         }
@@ -129,8 +127,7 @@ public class HistoryDataSource {
         String[] selA = {bib};
         Cursor cursor = context
                 .getContentResolver()
-                .query(((OpacClient) context.getApplication())
-                                .getHistoryProviderHistoryUri(),
+                .query(historyProviderUri,
                         HistoryDatabase.COLUMNS, HistoryDatabase.HIST_WHERE_LIB,
                         selA, null);
 
@@ -147,37 +144,37 @@ public class HistoryDataSource {
         return items;
     }
 
-    public ChangeType insertOrUpdate(String bib, JSONObject entry) throws  JSONException {
+    public ChangeType insertOrUpdate(String bib, JSONObject entry) throws JSONException {
 
         final String methodName = "insertOrUpdate";
 
         // - same id/medianr or same (title, author and type)
         // - and Zeitraum=(first bis last) überschneiden sich
         LocalDate firstDate = LocalDate.parse(entry.getString(HistoryDatabase.HIST_COL_FIRST_DATE));
-        LocalDate lastDate  = LocalDate.parse(entry.getString(HistoryDatabase.HIST_COL_LAST_DATE));
+        LocalDate lastDate = LocalDate.parse(entry.getString(HistoryDatabase.HIST_COL_LAST_DATE));
 
         Log.d(methodName, String.format("bib: %s, json: dates %s - %s", bib, firstDate, lastDate));
 
         HistoryItem item = null;
 
         if (entry.has(HistoryDatabase.HIST_COL_MEDIA_NR)) {
-            //
+            // mediaNr eindeutig
             String id = entry.getString(HistoryDatabase.HIST_COL_MEDIA_NR);
             Log.d(methodName, String.format("json: medianr %s", id));
-            item = isHistory(bib, id, firstDate, lastDate);
+            item = findItem(bib, id, firstDate, lastDate);
         } else {
             // title, type and author
             String title = entry.getString(HistoryDatabase.HIST_COL_TITLE);
             String author = entry.getString(HistoryDatabase.HIST_COL_AUTHOR);
             String mediatype = entry.getString(HistoryDatabase.HIST_COL_MEDIA_TYPE);
             Log.d(methodName, String.format("json: title %s, author %s, mediatype %s"
-                    ,title, author, mediatype));
-            item = isHistory(bib, title, author, mediatype , firstDate, lastDate);
+                    , title, author, mediatype));
+            item = findItem(bib, title, author, mediatype, firstDate, lastDate);
         }
         Log.d(methodName, String.format("HistoryItem: %s", item));
 
         ChangeType changeType = ChangeType.NOTHING;
-        if (item==null) {
+        if (item == null) {
             // noch kein entsprechender Satz in Datenbank
             Log.d(methodName, "call insertHistoryItem(...)");
             insertHistoryItem(bib, entry);
@@ -186,12 +183,12 @@ public class HistoryDataSource {
             // Satz vorhanden, ev. updaten
 
             // firstDate, lastDate und count 'mergen'
-            if (firstDate.compareTo(item.getFirstDate())<0) {
+            if (firstDate.compareTo(item.getFirstDate()) < 0) {
                 Log.d(methodName, "firstDate changed");
                 changeType = ChangeType.UPDATE;
                 item.setFirstDate(firstDate);
             }
-            if (lastDate.compareTo(item.getLastDate())>0) {
+            if (lastDate.compareTo(item.getLastDate()) > 0) {
                 Log.d(methodName, "lastDate changed");
                 changeType = ChangeType.UPDATE;
                 item.setLastDate(lastDate);
@@ -217,7 +214,7 @@ public class HistoryDataSource {
     private static JSONObject cursorToJson(String[] columns, Cursor cursor) throws
             JSONException {
         JSONObject jsonItem = new JSONObject();
-        int i=0;
+        int i = 0;
         for (String col : columns) {
             switch (col) {
                 case HistoryDatabase.HIST_COL_LENDING:
@@ -244,18 +241,18 @@ public class HistoryDataSource {
 
     public static HistoryItem cursorToItem(Cursor cursor) {
         HistoryItem item = new HistoryItem();
-        int i=0;
+        int i = 0;
         item.setHistoryId(cursor.getInt(i++));
         String ds = cursor.getString(i++);
-        if ( ds!=null) {
+        if (ds != null) {
             item.setFirstDate(LocalDate.parse(ds));
         }
         ds = cursor.getString(i++);
-        if ( ds!=null) {
+        if (ds != null) {
             item.setLastDate(LocalDate.parse(ds));
         }
         item.setLending(cursor.getInt(i++) > 0);
-        item.setMNr(cursor.getString(i++));
+        item.setId(cursor.getString(i++));
         item.setBib(cursor.getString(i++));
         item.setTitle(cursor.getString(i++));
         item.setAuthor(cursor.getString(i++));
@@ -263,7 +260,7 @@ public class HistoryDataSource {
         item.setStatus(cursor.getString(i++));
         item.setCover(cursor.getString(i++));
         String mds = cursor.getString(i++);
-        if (mds!=null) {
+        if (mds != null) {
             try {
                 SearchResult.MediaType mediaType = SearchResult.MediaType.valueOf(mds);
                 item.setMediaType(mediaType);
@@ -278,7 +275,7 @@ public class HistoryDataSource {
         item.setBarcode(cursor.getString(i++));
 
         ds = cursor.getString(i++);
-        if ( ds!=null) {
+        if (ds != null) {
             item.setDeadline(LocalDate.parse(ds));
         }
         int count = cursor.getInt(i++);
@@ -287,64 +284,64 @@ public class HistoryDataSource {
         return item;
     }
 
-    private void addAccountItemValues(ContentValues values, AccountItem item ) {
-        putOrNull(values,HistoryDatabase.HIST_COL_MEDIA_NR, item.getId());
-        putOrNull(values,HistoryDatabase.HIST_COL_TITLE, item.getTitle());
-        putOrNull(values,HistoryDatabase.HIST_COL_AUTHOR, item.getAuthor());
-        putOrNull(values,"format", item.getFormat());
-        putOrNull(values,"status", item.getStatus());
-        putOrNull(values,"cover", item.getCover());
+    private void addAccountItemValues(ContentValues values, AccountItem item) {
+        putOrNull(values, HistoryDatabase.HIST_COL_MEDIA_NR, item.getId());
+        putOrNull(values, HistoryDatabase.HIST_COL_TITLE, item.getTitle());
+        putOrNull(values, HistoryDatabase.HIST_COL_AUTHOR, item.getAuthor());
+        putOrNull(values, "format", item.getFormat());
+        putOrNull(values, "status", item.getStatus());
+        putOrNull(values, HistoryDatabase.HIST_COL_COVER, item.getCover());
         SearchResult.MediaType mediaType = item.getMediaType();
-        putOrNull(values,"mediatype", mediaType != null ? mediaType.toString() : null);
+        putOrNull(values, HistoryDatabase.HIST_COL_MEDIA_TYPE, mediaType != null ? mediaType.toString() : null);
     }
 
     private ContentValues createContentValues(HistoryItem historyItem) {
         ContentValues values = new ContentValues();
         addAccountItemValues(values, historyItem);
 
-        putOrNull(values,HistoryDatabase.HIST_COL_FIRST_DATE, historyItem.getFirstDate());
-        putOrNull(values,HistoryDatabase.HIST_COL_LAST_DATE, historyItem.getLastDate());
-        putOrNull(values,HistoryDatabase.HIST_COL_LENDING, historyItem.isLending());
-        putOrNull(values,"bib", historyItem.getBib());
-        putOrNull(values,"homeBranch", historyItem.getHomeBranch());
-        putOrNull(values,"lendingBranch", historyItem.getLendingBranch());
-        putOrNull(values,"ebook", historyItem.isEbook());
-        putOrNull(values,"barcode", historyItem.getBarcode());
-        putOrNull(values,HistoryDatabase.HIST_COL_DEADLINE, historyItem.getDeadline());
+        putOrNull(values, HistoryDatabase.HIST_COL_FIRST_DATE, historyItem.getFirstDate());
+        putOrNull(values, HistoryDatabase.HIST_COL_LAST_DATE, historyItem.getLastDate());
+        putOrNull(values, HistoryDatabase.HIST_COL_LENDING, historyItem.isLending());
+        putOrNull(values, "bib", historyItem.getBib());
+        putOrNull(values, "homeBranch", historyItem.getHomeBranch());
+        putOrNull(values, "lendingBranch", historyItem.getLendingBranch());
+        putOrNull(values, "ebook", historyItem.isEbook());
+        putOrNull(values, "barcode", historyItem.getBarcode());
+        putOrNull(values, HistoryDatabase.HIST_COL_DEADLINE, historyItem.getDeadline());
         values.put("prolongCount", historyItem.getProlongCount());
 
         return values;
     }
 
-    private void updateHistoryItem(HistoryItem historyItem ) {
+    private void updateHistoryItem(HistoryItem historyItem) {
         ContentValues values = createContentValues(historyItem);
         String where = "historyId = ?";
         context.getContentResolver()
-               .update(((OpacClient) context.getApplication()).getHistoryProviderHistoryUri()
+               .update(historyProviderUri
                        , values, where, new String[]{Integer.toString(historyItem.getHistoryId())
-                       } );
+                       });
     }
 
-    public void insertHistoryItem(HistoryItem historyItem ) {
+    public void insertHistoryItem(HistoryItem historyItem) {
         ContentValues values = createContentValues(historyItem);
         context.getContentResolver()
-               .insert(((OpacClient) context.getApplication()).getHistoryProviderHistoryUri(),
-               values);
+               .insert(historyProviderUri,
+                       values);
     }
 
-    public void insertHistoryItem(String bib, JSONObject item ) throws JSONException {
+    public void insertHistoryItem(String bib, JSONObject item) throws JSONException {
         ContentValues values = new ContentValues();
         values.put("bib", bib);
 
         Iterator<String> keys = item.keys();
-        while(keys.hasNext()) {
+        while (keys.hasNext()) {
             String key = keys.next();
             switch (key) {
                 case HistoryDatabase.HIST_COL_LENDING:
                 case "ebook":
                     // boolean
                     boolean b = (1 == item.getInt(key));
-                    putOrNull(values, key, b );
+                    putOrNull(values, key, b);
                     break;
                 case "prolongCount":
                     // Integer
@@ -369,15 +366,15 @@ public class HistoryDataSource {
                     // date wird als String inserted
                 default:
                     // String
-                    putOrNull(values,key, item.getString(key) );
+                    putOrNull(values, key, item.getString(key));
             }
         }
         context.getContentResolver()
-               .insert(((OpacClient) context.getApplication()).getHistoryProviderHistoryUri(),
-               values);
+               .insert(historyProviderUri,
+                       values);
     }
 
-    private void insertLentItem(String bib, LentItem lentItem ) {
+    private void insertLentItem(String bib, LentItem lentItem) {
         ContentValues values = new ContentValues();
         addAccountItemValues(values, lentItem);
 
@@ -393,8 +390,8 @@ public class HistoryDataSource {
         putOrNull(values, HistoryDatabase.HIST_COL_DEADLINE, lentItem.getDeadline());
 
         context.getContentResolver()
-               .insert(((OpacClient) context.getApplication()).getHistoryProviderHistoryUri(),
-               values);
+               .insert(historyProviderUri,
+                       values);
     }
 
     private void putOrNull(ContentValues cv, String key, String value) {
@@ -404,6 +401,7 @@ public class HistoryDataSource {
             cv.putNull(key);
         }
     }
+
     private void putOrNull(ContentValues cv, String key, LocalDate value) {
         if (value != null) {
             cv.put(key, value.toString());
@@ -411,6 +409,7 @@ public class HistoryDataSource {
             cv.putNull(key);
         }
     }
+
     private void putOrNull(ContentValues cv, String key, boolean value) {
         cv.put(key, value ? Boolean.TRUE : Boolean.FALSE);
     }
@@ -420,8 +419,7 @@ public class HistoryDataSource {
         String[] selA = {bib};
         Cursor cursor = context
                 .getContentResolver()
-                .query(((OpacClient) context.getApplication())
-                                .getHistoryProviderHistoryUri(),
+                .query(historyProviderUri,
                         HistoryDatabase.COLUMNS, HistoryDatabase.HIST_WHERE_LIB,
                         selA, null);
 
@@ -439,8 +437,7 @@ public class HistoryDataSource {
     public void sort(String bib, String sortOrder) {
         String[] selA = {bib};
         context.getContentResolver()
-               .query(((OpacClient) context.getApplication())
-                               .getHistoryProviderHistoryUri(),
+               .query(historyProviderUri,
                        HistoryDatabase.COLUMNS, HistoryDatabase.HIST_WHERE_LIB,
                        selA, sortOrder);
     }
@@ -450,8 +447,7 @@ public class HistoryDataSource {
         String[] selA = {bib};
         Cursor cursor = context
                 .getContentResolver()
-                .query(((OpacClient) context.getApplication())
-                                .getHistoryProviderHistoryUri(),
+                .query(historyProviderUri,
                         HistoryDatabase.COLUMNS, HistoryDatabase.HIST_WHERE_LIB_LENDING,
                         selA, null);
 
@@ -471,8 +467,7 @@ public class HistoryDataSource {
         String[] selA = {bib, title};
         Cursor cursor = context
                 .getContentResolver()
-                .query(((OpacClient) context.getApplication())
-                                .getHistoryProviderHistoryUri(),
+                .query(historyProviderUri,
                         HistoryDatabase.COLUMNS,
                         HistoryDatabase.HIST_WHERE_TITLE_LIB, selA, null);
         HistoryItem item = null;
@@ -487,13 +482,12 @@ public class HistoryDataSource {
         return item;
     }
 
-    public HistoryItem getItem(String bib, String id) {
-        String[] selA = {bib, id};
+    public HistoryItem getItem(String bib, String mediaNr) {
+        String[] selA = {bib, mediaNr};
         Cursor cursor = context
                 .getContentResolver()
-                .query(((OpacClient) context.getApplication())
-                                .getHistoryProviderHistoryUri(),
-                        HistoryDatabase.COLUMNS, HistoryDatabase.HIST_WHERE_LIB_NR,
+                .query(historyProviderUri,
+                        HistoryDatabase.COLUMNS, HistoryDatabase.HIST_WHERE_LIB_MEDIA_NR,
                         selA, null);
         HistoryItem item = null;
 
@@ -507,12 +501,11 @@ public class HistoryDataSource {
         return item;
     }
 
-    public HistoryItem getItem(long id) {
-        String[] selA = {String.valueOf(id)};
+    public HistoryItem getItem(long historyId) {
+        String[] selA = {String.valueOf(historyId)};
         Cursor cursor = context
                 .getContentResolver()
-                .query(((OpacClient) context.getApplication())
-                                .getHistoryProviderHistoryUri(),
+                .query(historyProviderUri,
                         HistoryDatabase.COLUMNS, HistoryDatabase.HIST_WHERE_HISTORY_ID, selA,
                         null);
         HistoryItem item = null;
@@ -527,48 +520,46 @@ public class HistoryDataSource {
         return item;
     }
 
-    public HistoryItem isHistory(String bib, String id, LocalDate firstDate, LocalDate lastDate) {
-        if (id == null) {
+    private HistoryItem findItem(String bib, String mediaNr, LocalDate firstDate,
+            LocalDate lastDate) {
+        if (mediaNr == null) {
             return null;
         }
 
-        String[] selA = {bib, id};
+        String[] selA = {bib, mediaNr};
         Cursor cursor = context
                 .getContentResolver()
-                .query(((OpacClient) context.getApplication())
-                                .getHistoryProviderHistoryUri(),
-                        HistoryDatabase.COLUMNS, HistoryDatabase.HIST_WHERE_LIB_NR,
+                .query(historyProviderUri,
+                        HistoryDatabase.COLUMNS, HistoryDatabase.HIST_WHERE_LIB_MEDIA_NR,
                         selA, null);
-        cursor.moveToFirst();
-        HistoryItem item = foo(cursor, firstDate, lastDate);
+        HistoryItem item = findItemToDates(cursor, firstDate, lastDate);
         cursor.close();
 
         return item;
     }
 
-    public HistoryItem isHistory(String bib, String title, String author, String mediatype
+    private HistoryItem findItem(String bib, String title, String author, String mediatype
             , LocalDate firstDate, LocalDate lastDate) {
 
         String[] selA = {bib, title, author, mediatype};
         Cursor cursor = context
                 .getContentResolver()
-                .query(((OpacClient) context.getApplication())
-                                .getHistoryProviderHistoryUri(),
+                .query(historyProviderUri,
                         HistoryDatabase.COLUMNS, HistoryDatabase.HIST_WHERE_LIB_TITLE_AUTHOR_TYPE,
                         selA, null);
-        cursor.moveToFirst();
-        HistoryItem item = foo(cursor, firstDate, lastDate);
+        HistoryItem item = findItemToDates(cursor, firstDate, lastDate);
         cursor.close();
         return item;
     }
 
-    private HistoryItem foo(Cursor cursor, LocalDate firstDate, LocalDate lastDate) {
+    private HistoryItem findItemToDates(Cursor cursor, LocalDate firstDate, LocalDate lastDate) {
+        cursor.moveToFirst();
         while (!cursor.isAfterLast()) {
             HistoryItem item = cursorToItem(cursor);
 
-            if (firstDate.compareTo(item.getLastDate())>0) {
+            if (firstDate.compareTo(item.getLastDate()) > 0) {
                 // firstDate > item.lastDate: Zeitraum überschneidet sich nicht
-            } else if (item.getFirstDate().compareTo(lastDate)>0) {
+            } else if (item.getFirstDate().compareTo(lastDate) > 0) {
                 // item.firstDate > lastDate: Zeitraum überschneidet sich nicht
                 item = null;
             } else {
@@ -589,8 +580,7 @@ public class HistoryDataSource {
         String[] selA = {bib, title};
         Cursor cursor = context
                 .getContentResolver()
-                .query(((OpacClient) context.getApplication())
-                                .getHistoryProviderHistoryUri(),
+                .query(historyProviderUri,
                         HistoryDatabase.COLUMNS,
                         HistoryDatabase.HIST_WHERE_TITLE_LIB, selA, null);
         int c = cursor.getCount();
@@ -601,9 +591,76 @@ public class HistoryDataSource {
     public void remove(HistoryItem item) {
         String[] selA = {"" + item.getHistoryId()};
         context.getContentResolver()
-               .delete(((OpacClient) context.getApplication())
-                               .getHistoryProviderHistoryUri(),
+               .delete(historyProviderUri,
                        HistoryDatabase.HIST_WHERE_HISTORY_ID, selA);
+    }
+
+    /**
+     * Löscht alle Einträge zu einer Bibliothek
+     *
+     * @param bib Name der Bibliothek/Library
+     */
+    public void removeAll(String bib) {
+        String[] selA = {bib};
+        context.getContentResolver()
+               .delete(historyProviderUri,
+                       HistoryDatabase.HIST_WHERE_LIB, selA);
+    }
+
+    /**
+     * Löscht alle Einträge zu allen Bibliothekcn in der Database
+     */
+    public void removeAll() {
+        context.getContentResolver()
+               .delete(historyProviderUri,
+                       null, null);
+    }
+
+    public int getCountItems() {
+        Cursor cursor = context
+                .getContentResolver()
+                .query(historyProviderUri,
+                        new String[]{"count(*)"},
+                        null, null, null);
+        cursor.moveToFirst();
+        int count = 0;
+        if (!cursor.isAfterLast()) {
+            count = cursor.getInt(0);
+        }
+        cursor.close();
+        return count;
+    }
+
+    public int getCountItemsWithMediatype() {
+        Cursor cursor = context
+                .getContentResolver()
+                .query(historyProviderUri,
+                        new String[]{"count(*)"},
+                        HistoryDatabase.HIST_COL_MEDIA_TYPE + " is not null"
+                        , null, null);
+        cursor.moveToFirst();
+        int count = 0;
+        if (!cursor.isAfterLast()) {
+            count = cursor.getInt(0);
+        }
+        cursor.close();
+        return count;
+    }
+
+    public int getCountItemsWithCover() {
+        Cursor cursor = context
+                .getContentResolver()
+                .query(historyProviderUri,
+                        new String[]{"count(*)"},
+                        HistoryDatabase.HIST_COL_COVER + " is not null"
+                        , null, null);
+        cursor.moveToFirst();
+        int count = 0;
+        if (!cursor.isAfterLast()) {
+            count = cursor.getInt(0);
+        }
+        cursor.close();
+        return count;
     }
 
     public void renameLibraries(Map<String, String> map) {
@@ -612,8 +669,7 @@ public class HistoryDataSource {
             cv.put("bib", entry.getValue());
 
             context.getContentResolver()
-                   .update(((OpacClient) context.getApplication())
-                                   .getHistoryProviderHistoryUri(),
+                   .update(historyProviderUri,
                            cv, HistoryDatabase.HIST_WHERE_LIB,
                            new String[]{entry.getKey()});
         }

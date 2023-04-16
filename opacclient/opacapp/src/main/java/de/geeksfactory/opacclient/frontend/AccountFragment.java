@@ -1728,14 +1728,28 @@ public class AccountFragment extends Fragment implements
                 adatasource.update(account);
                 adatasource.storeCachedAccountData(adatasource.getAccount(data.getAccount()), data);
 
-                // Update Lent-History
-                HistoryDataSource historyDataSource;
+                PreferenceDataSource prefs = null;
                 if (getActivity() == null && OpacClient.getEmergencyContext() != null) {
-                    // TODO HistoryDataSource erwartet Activity
-                   //  historyDataSource = new HistoryDataSource(OpacClient.getEmergencyContext());
+                     prefs = new PreferenceDataSource(OpacClient.getEmergencyContext());
                 } else {
-                    historyDataSource = new HistoryDataSource(getActivity());
-                    historyDataSource.updateLenting(adatasource.getAccount(data.getAccount()), data);
+                     prefs = new PreferenceDataSource(getActivity());
+                }
+
+                // Update Lent-History?
+                if (prefs.isHistoryMaintain()) {
+                    HistoryDataSource historyDataSource = null;
+                    if (getActivity() == null) {
+                        if (OpacClient.getEmergencyContext() != null) {
+                            historyDataSource =
+                                    new HistoryDataSource(OpacClient.getEmergencyContext(), app);
+                        }
+                    } else {
+                        historyDataSource = new HistoryDataSource(getActivity());
+                    }
+                    if (historyDataSource != null) {
+                        historyDataSource
+                                .updateLending(adatasource.getAccount(data.getAccount()), data);
+                    }
                 }
 
             } finally {

@@ -74,6 +74,7 @@ import de.geeksfactory.opacclient.R;
 import de.geeksfactory.opacclient.objects.Account;
 import de.geeksfactory.opacclient.reminder.ReminderHelper;
 import de.geeksfactory.opacclient.storage.AccountDataSource;
+import de.geeksfactory.opacclient.storage.PreferenceDataSource;
 import de.geeksfactory.opacclient.ui.AccountSwitcherNavigationView;
 import de.geeksfactory.opacclient.utils.Utils;
 
@@ -92,6 +93,8 @@ public abstract class OpacActivity extends AppCompatActivity
     protected CharSequence title;
 
     protected Fragment fragment;
+    protected Fragment historyFragment = null;
+
     protected boolean hasDrawer = false;
     protected Toolbar toolbar;
     private boolean twoPane;
@@ -155,6 +158,10 @@ public abstract class OpacActivity extends AppCompatActivity
                         savedInstanceState, "fragment");
                 getSupportFragmentManager().beginTransaction()
                                            .replace(R.id.content_frame, fragment).commit();
+            }
+            if (savedInstanceState.containsKey("historyFragment")) {
+                historyFragment = getSupportFragmentManager().getFragment(
+                        savedInstanceState, "historyFragment");
             }
         }
         fixStatusBarFlashing();
@@ -329,6 +336,17 @@ public abstract class OpacActivity extends AppCompatActivity
                 }, 500);
 
             }
+
+            // entweder über PreferenceDataSource, type-safe
+            PreferenceDataSource prefs = new PreferenceDataSource(this);
+            boolean historyMaintain = prefs.isHistoryMaintain();
+            // oder über SharedPreferences mit "string"
+            // boolean historyMaintain = sp.getBoolean("history_maintain", true);
+
+            // item disablen
+            drawer.getMenu().findItem(R.id.nav_history).setEnabled(historyMaintain);
+            // oder ganz verstecken?
+            // drawer.getMenu().findItem(R.id.nav_history).setVisible(historyMaintain);
         }
     }
 
@@ -380,6 +398,8 @@ public abstract class OpacActivity extends AppCompatActivity
             drawer.setCheckedItem(R.id.nav_search);
         } else if (fragment instanceof AccountFragment) {
             drawer.setCheckedItem(R.id.nav_account);
+        } else if (fragment instanceof HistoryFragment) {
+            drawer.setCheckedItem(R.id.nav_history);
         } else if (fragment instanceof StarredFragment) {
             drawer.setCheckedItem(R.id.nav_starred);
         } else if (fragment instanceof InfoFragment) {
@@ -424,7 +444,10 @@ public abstract class OpacActivity extends AppCompatActivity
             setTwoPane(true);
             setFabVisible(false);
         } else if (id == R.id.nav_history) {
-            fragment = new HistoryFragment();
+            if (historyFragment == null) {
+                historyFragment = new HistoryFragment();
+            }
+            fragment = historyFragment;
             setTwoPane(true);
             setFabVisible(false);
         } else if (id == R.id.nav_info) {
@@ -493,6 +516,9 @@ public abstract class OpacActivity extends AppCompatActivity
                 break;
             case "starred":
                 id = R.id.nav_starred;
+                break;
+            case "history":
+                id = R.id.nav_history;
                 break;
             case "info":
                 id = R.id.nav_info;
@@ -702,6 +728,10 @@ public abstract class OpacActivity extends AppCompatActivity
         if (fragment != null) {
             getSupportFragmentManager().putFragment(outState, "fragment",
                     fragment);
+        }
+        if (historyFragment != null) {
+            getSupportFragmentManager().putFragment(outState, "historyFragment",
+                    historyFragment);
         }
         if (title != null) {
             outState.putCharSequence("title", title);
