@@ -147,7 +147,7 @@ public class MeaningDetectorImpl implements MeaningDetector {
                     ((TextSearchField) field).getHint());
         } else if (meaning == Meaning.AUDIENCE || meaning == Meaning.SYSTEM
                 || meaning == Meaning.KEYWORD || meaning == Meaning.PUBLISHER
-                || meaning == Meaning.AVAILABLE) {
+                || meaning == Meaning.AVAILABLE || meaning == Meaning.ISBN ) {
             field.setAdvanced(true);
         }
         field.setData(oldfield.getData());
