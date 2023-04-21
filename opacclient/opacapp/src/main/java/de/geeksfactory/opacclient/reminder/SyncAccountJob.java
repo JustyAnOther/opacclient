@@ -241,7 +241,7 @@ public class SyncAccountJob extends Worker {
 
                 // Update Lent-History
                 if (sp.getBoolean("history_maintain", false)) {
-                    HistoryDataSource historyDataSource = new HistoryDataSource(getContext(), app);
+                    HistoryDataSource historyDataSource = new HistoryDataSource(getApplicationContext(), app);
                     historyDataSource.updateLending(account, res);
                 }
 

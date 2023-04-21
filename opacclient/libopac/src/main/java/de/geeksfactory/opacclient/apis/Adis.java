@@ -607,8 +607,8 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
     }
 
     @Override
-    public void init(Library library, HttpClientFactory httpClientFactory) {
-        super.init(library, httpClientFactory);
+    public void init(Library library, HttpClientFactory httpClientFactory, boolean debug) {
+        super.init(library, httpClientFactory, debug);
         this.library = library;
         this.data = library.getData();
         try {
@@ -1105,6 +1105,7 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
                         String msg = doc.select(".alert").first().ownText();
                         if (msg.contains("nicht reserviert werden")) {
                             res = new ReservationResult(MultiStepResult.Status.ERROR, msg);
+                            doc = reservationGoBack(doc);
                         }
                     }
                 }
@@ -1114,6 +1115,25 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
         if (res == null
                 || res.getStatus() == MultiStepResult.Status.SELECTION_NEEDED
                 || res.getStatus() == MultiStepResult.Status.CONFIRMATION_NEEDED) {
+            doc = reservationGoBack(doc);
+        }
+
+        // Reset
+        try {
+            reset(doc);
+        } catch (OpacErrorException e) {
+            e.printStackTrace();
+        }
+
+        return res;
+    }
+
+    private Document reservationGoBack(Document doc) throws IOException {
+        // cancels the reservation process, i.e. goes back to the result detail page.
+        int max_steps = 3;
+        while (max_steps > 0) {
+            // In newer OPACs, e.g. Zürich, we need to step back multiple times
+            List<NameValuePair> form;
             form = new ArrayList<>();
             for (Element input : doc.select("input, select")) {
                 if (!"image".equals(input.attr("type"))
@@ -1125,6 +1145,9 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
                 }
             }
             Element button = doc.select("input[value=Abbrechen], input[value=Zurück]").first();
+            if (button == null) {
+                return doc;
+            }
             form.add(new BasicNameValuePair(button.attr("name"), button.attr("value")));
             doc = htmlPost(opac_url + ";jsessionid=" + s_sid, form);
         }
@@ -1136,7 +1159,7 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
             e.printStackTrace();
         }
 
-        return res;
+        return doc;
     }
 
     void updatePageform(Document doc) {
@@ -1169,7 +1192,7 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
         } catch (OpacErrorException e) {
             return new ProlongResult(Status.ERROR, e.getMessage());
         }
-        for (Element tr : doc.select(".rTable_div tr")) {
+        for (Element tr : getServiceElements(doc)) {
             if (tr.select("a").size() == 1) {
                 if (tr.select("a").first().absUrl("href")
                       .contains("sp=SZA")) {
@@ -1193,7 +1216,7 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
                         .attr("value")));
             }
         }
-        for (Element tr : doc.select(".rTable_div tr")) {
+        for (Element tr : getServiceElements(doc)) {
             if (tr.select("input").attr("name").equals(media.split("\\|")[0])) {
                 boolean disabled = tr.select("input").hasAttr("disabled");
                 try {
@@ -1252,7 +1275,7 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
         } catch (OpacErrorException e) {
             return new ProlongAllResult(Status.ERROR, e.getMessage());
         }
-        for (Element tr : doc.select(".rTable_div tr")) {
+        for (Element tr : getServiceElements(doc)) {
             if (tr.select("a").size() == 1) {
                 if (tr.select("a").first().absUrl("href")
                       .contains("sp=SZA")) {
@@ -1315,6 +1338,12 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
     }
 
     @Override
+    public ProlongAllResult prolongMultiple(List<String> media,
+            Account account, int useraction, String selection) throws IOException {
+        return null;
+    }
+
+    @Override
     public CancelResult cancel(String media, Account account, int useraction,
             String selection) throws IOException, OpacErrorException {
         String rlink = null;
@@ -1326,7 +1355,7 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
         } catch (OpacErrorException e) {
             return new CancelResult(Status.ERROR, e.getMessage());
         }
-        for (Element tr : doc.select(".rTable_div tr")) {
+        for (Element tr : getServiceElements(doc)) {
             String url = media.split("\\|")[1].toUpperCase(Locale.GERMAN);
             String sp = "SZM";
             if (url.contains("SP=")) {
@@ -1423,10 +1452,12 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
         DateTimeFormatter fmt = DateTimeFormat.forPattern("dd.MM.yyyy").withLocale(Locale.GERMAN);
 
         // Ausleihen
+        Ausleihen ausleihen = getAusleihen(doc);
+        List<LentItem> lent = new ArrayList<>();
+        /*
         String alink = null;
         int anum = 0;
-        List<LentItem> lent = new ArrayList<>();
-        for (Element tr : doc.select(".rTable_div tr")) {
+        for (Element tr : getServiceElements(doc)) {
             if (tr.select("a").size() == 1) {
                 if (tr.select("a").first().absUrl("href").contains("sp=SZA")) {
                     alink = tr.select("a").first().absUrl("href");
@@ -1434,9 +1465,11 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
                 }
             }
         }
-        if (alink != null) {
-            Document adoc = htmlGet(alink);
-            s_alink = alink;
+        */
+
+        if (ausleihen.alink != null) {
+            Document adoc = htmlGet(ausleihen.alink);
+            s_alink = ausleihen.alink;
             List<NameValuePair> form = new ArrayList<>();
             String prolongTest = null;
             for (Element input : adoc.select("input, select")) {
@@ -1461,8 +1494,8 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
                     adoc = adoc_new;
                 }
             }
-            parseMediaList(adoc, alink, lent, split_title_author);
-            assert (lent.size() == anum);
+            parseMediaList(adoc, ausleihen.alink, lent, split_title_author);
+            assert (lent.size() == ausleihen.anum);
             form = new ArrayList<>();
             boolean cancelButton = false;
             for (Element input : adoc.select("input, select")) {
@@ -1486,15 +1519,16 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
             }
             doc = htmlPost(opac_url + ";jsessionid=" + s_sid, form);
         } else {
-            assert (anum == 0);
+            assert (ausleihen.anum == 0);
         }
 
         adata.setLent(lent);
 
+        Reservierungen reservierungen = getReservierungen(doc);
+        /*
         List<String[]> rlinks = new ArrayList<>();
         int rnum = 0;
-        List<ReservedItem> res = new ArrayList<>();
-        for (Element tr : doc.select(".rTable_div tr")) {
+        for (Element tr : getServiceElements(doc)) {
             if (tr.select("a").size() == 1) {
                 if ((tr.text().contains("Reservationen")
                         || tr.text().contains("Vormerkung")
@@ -1511,7 +1545,10 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
                 }
             }
         }
-        for (String[] rlink : rlinks) {
+        */
+
+        List<ReservedItem> res = new ArrayList<>();
+        for (String[] rlink : reservierungen.rlinks) {
             Document rdoc = htmlGet(rlink[1]);
             boolean error =
                     parseReservationList(rdoc, rlink, split_title_author, res, fmt, stringProvider);
@@ -1543,11 +1580,86 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
             htmlPost(opac_url + ";jsessionid=" + s_sid, form);
         }
 
-        assert (res.size() == rnum);
+        assert (res.size() == reservierungen.rnum);
 
         adata.setReservations(res);
 
         return adata;
+    }
+
+    static Elements getServiceElements(Document doc) {
+        return doc.select("#konto-services");
+        /*
+        Elements elements = doc.select("#konto-services");
+        if (elements.size() == 1) {
+            return elements.first();
+        }
+        return null;
+         */
+        // return doc.select(".rTable_div tr");
+    }
+
+    private class Ausleihen {
+        int anum;
+        String alink;
+
+        Ausleihen(int anum, String alink) {
+            this.anum = anum;
+            this.alink = alink;
+        }
+    }
+
+    Ausleihen getAusleihen(Document doc) {
+        Elements serviceElements = getServiceElements(doc);
+        if (serviceElements.size() == 1) {
+            for (Element a : serviceElements.first().select("a")) {
+                String alink = a.absUrl("href");
+                if (alink.contains("sp=S*SZA")) {
+                    int anum = Integer.parseInt(a.text().replaceAll("[^\\d]", "").trim());
+                    return new Ausleihen(anum, alink);
+                }
+            }
+        }
+        return new Ausleihen(0, null);
+    }
+
+    private class Reservierungen {
+        int rnum;
+        List<String[]> rlinks;
+
+        Reservierungen(int rnum, List<String[]> rlinks) {
+            this.rnum = rnum;
+            this.rlinks = rlinks;
+        }
+    }
+
+    Reservierungen getReservierungen(Document doc) {
+        List<String[]> rlinks = new ArrayList<>();
+        int rnum = 0;
+
+        List<ReservedItem> res = new ArrayList<>();
+        Elements serviceElements = getServiceElements(doc);
+        if (serviceElements.size() == 1) {
+            for (Element a: serviceElements.first().select("a")) {
+                String aText = a.text();
+                if ((aText.contains("Reservationen")
+                        || aText.contains("Vormerkung")
+                        || aText.contains("Fernleihbestellung")
+                        || aText.contains("Bereitstellung")
+                        || aText.contains("Bestellw")
+                        || aText.contains("Magazin"))
+                        && !aText.trim().equals("")) {
+
+                    rlinks.add(new String[]{
+                            aText,
+                            a.absUrl("href"),
+                    });
+
+                    rnum += Integer.parseInt(aText.replaceAll("[^\\d]", "").trim());
+                }
+            }
+        }
+        return new Reservierungen(rnum, rlinks);
     }
 
     static boolean parseReservationList(Document doc, String[] rlink, boolean split_title_author,
@@ -2086,5 +2198,4 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
         String msg = String.format(format, args);
         LOGGER.log(Level.INFO, msg);
     }
-
 }

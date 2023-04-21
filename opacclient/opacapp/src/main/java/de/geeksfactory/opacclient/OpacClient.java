@@ -319,6 +319,17 @@ public class OpacClient extends Application {
         if (jsonData.has("baseurl")) {
             String baseurl = jsonData.getString("baseurl");
             LOGGER.log(Level.INFO, String.format("%s - baseurl = %s", methodName, baseurl));
+
+            final String oldUrl = "https://opac.sbs.stuttgart.de/aDISWeb/app";
+            final String baseUrl = jsonData.getString("baseurl");
+            if (oldUrl.equals(baseUrl)) {
+                final String newUrl = "https://stadtbibliothek-stuttgart.de/aDISWeb/app";
+                jsonData.put("baseurl", newUrl);
+                jsonObject.put("data", jsonData);
+                Log.i(methodName, json.toString() + " android.util.Log.i");
+                LOGGER.log(Level.INFO, String.format("%s - newUrl = %s (java.util.logger.log(INFO...)", methodName, newUrl));
+            }
+
         } else {
             LOGGER.log(Level.INFO, String.format("%s - baseurl not set. json = %s"
                     , methodName, json));

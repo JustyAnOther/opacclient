@@ -5,6 +5,7 @@ import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
 import org.json.JSONException;
 import org.jsoup.Jsoup;
+import org.jsoup.select.Elements;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -31,7 +32,7 @@ public class AdisAccountTest extends BaseHtmlTest {
 
     private static final String[] FILES =
 //            new String[]{"tuebingen.html", "stuttgart.html", "stuttgart2.html", "stuttgart3.html", "muenchen.html"};
-            new String[]{"stuttgart4.html"};
+            new String[]{"stuttgart3.html"};
 
     @Parameterized.Parameters(name = "{0}")
     public static Collection<String[]> files() {
@@ -40,6 +41,15 @@ public class AdisAccountTest extends BaseHtmlTest {
             files.add(new String[]{file});
         }
         return files;
+    }
+
+    @Test
+    public void testGetServiceElements() throws OpacApi.OpacErrorException, JSONException {
+        String html = readResource("/adis/account/" + file);
+        if (html == null) return; // we may not have all files for all libraries
+        List<LentItem> media = new ArrayList<>();
+        Elements elements = Adis.getServiceElements(Jsoup.parse(html));
+        assertTrue(elements.size() > 0);
     }
 
     @Test
