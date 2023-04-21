@@ -4,8 +4,6 @@ import org.joda.time.LocalDate;
 
 import java.util.Date;
 
-import de.geeksfactory.opacclient.objects.Starred;
-
 public class StarBranchItem extends Starred {
     private long branchId;
     private String status;
