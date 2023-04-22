@@ -136,6 +136,9 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
 
     public Document htmlGet(String url) throws
             IOException {
+        final String methodName = "htmlGet ";
+
+        logInfo("%s %s - %s", methodName, s_requestCount, url);
 
         if (!url.contains("requestCount") && s_requestCount >= 0) {
             url = url + (url.contains("?") ? "&" : "?") + "requestCount="
@@ -143,20 +146,14 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
         }
 
         String html = httpGet(url, getDefaultEncoding());
-        Document doc = Jsoup.parse(html);
-        Pattern patRequestCount = Pattern.compile("requestCount=([0-9]+)");
-        for (Element a : doc.select("a")) {
-            Matcher objid_matcher = patRequestCount.matcher(a.attr("href"));
-            if (objid_matcher.matches()) {
-                s_requestCount = Integer.parseInt(objid_matcher.group(1));
-            }
-        }
-        doc.setBaseUri(url);
-        return doc;
+
+        return parseHtml(methodName, url, html);
     }
 
     public Document htmlPost(String url, List<NameValuePair> data)
             throws IOException {
+        final String methodName = "htmlPost";
+
         boolean rcf = false;
         for (NameValuePair nv : data) {
             if (nv.getName().equals("requestCount")) {
@@ -164,6 +161,7 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
                 break;
             }
         }
+        logInfo("%s %s - %s", methodName, s_requestCount, url);
         if (!rcf) {
             data.add(new BasicNameValuePair("requestCount", s_requestCount + ""));
         }
@@ -180,9 +178,9 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
             }
             if(sb.length()>0) {
                 sb.setLength(sb.length()-1);
-                logInfo("%s - %s", "htmlPost", sb.toString());
+                logInfo("%s - %s", methodName, sb.toString());
             } else {
-                logInfo("%s - %s", "htmlPost", "no $Toolbar...");
+                logInfo("%s - %s", methodName, "no $Toolbar...");
             }
         }
 
@@ -192,25 +190,39 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
         }
 
         String html = httpPost(url, builder.build(), getDefaultEncoding());
+
+        return parseHtml(methodName, url, html);
+    }
+
+    private Document parseHtml(String methodName, String url, String html) {
         Document doc = Jsoup.parse(html);
 
         if (LOGGER.isLoggable(Level.INFO)) {
-            Elements h1s = doc.select("h1");
-            if (h1s.size() > 0) {
-                logInfo("%s - h1: %s", "htmlPost", h1s.first().text());
-            }
+            Elements elements = doc.select("title");
+            String title = ( (elements.size() > 0) ? elements.first().text(): "-");
+            elements = doc.select("h1");
+            String h1 = ( (elements.size() > 0) ? elements.get(elements.size()-1).text(): "-");
+            logInfo("%s Result - title/h1: %s/%s", methodName, title, h1);
         }
 
+        setRequestCount(doc);
+
+        doc.setBaseUri(url);
+
+        return doc;
+    }
+
+    private boolean setRequestCount(Document doc) {
         Pattern patRequestCount = Pattern
-                .compile(".*requestCount=([0-9]+)[^0-9].*");
+                .compile("requestCount=([0-9]+)");
         for (Element a : doc.select("a")) {
             Matcher objid_matcher = patRequestCount.matcher(a.attr("href"));
-            if (objid_matcher.matches()) {
+            if (objid_matcher.find()) {
                 s_requestCount = Integer.parseInt(objid_matcher.group(1));
+                return true;
             }
         }
-        doc.setBaseUri(url);
-        return doc;
+        return false;
     }
 
     private void _start() throws IOException, OpacErrorException {
@@ -1179,7 +1191,6 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
     @Override
     public ProlongResult prolong(String media, Account account, int useraction,
             String selection) throws IOException {
-        String alink = null;
         Document doc;
 
         try {
@@ -1192,19 +1203,13 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
         } catch (OpacErrorException e) {
             return new ProlongResult(Status.ERROR, e.getMessage());
         }
-        for (Element tr : getServiceElements(doc)) {
-            if (tr.select("a").size() == 1) {
-                if (tr.select("a").first().absUrl("href")
-                      .contains("sp=SZA")) {
-                    alink = tr.select("a").first().absUrl("href");
-                }
-            }
-        }
-        if (alink == null) {
+        Ausleihen ausleihen = getAusleihen(doc);
+
+        if (ausleihen.alink == null) {
             return new ProlongResult(Status.ERROR);
         }
 
-        doc = htmlGet(alink);
+        doc = htmlGet(ausleihen.alink);
 
         List<NameValuePair> form = new ArrayList<>();
         for (Element input : doc.select("input, select")) {
@@ -1263,7 +1268,6 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
     @Override
     public ProlongAllResult prolongAll(Account account, int useraction,
             String selection) throws IOException {
-        String alink = null;
         Document doc;
         try {
             _start();
@@ -1275,19 +1279,12 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
         } catch (OpacErrorException e) {
             return new ProlongAllResult(Status.ERROR, e.getMessage());
         }
-        for (Element tr : getServiceElements(doc)) {
-            if (tr.select("a").size() == 1) {
-                if (tr.select("a").first().absUrl("href")
-                      .contains("sp=SZA")) {
-                    alink = tr.select("a").first().absUrl("href");
-                }
-            }
-        }
-        if (alink == null) {
+        Ausleihen ausleihen = getAusleihen(doc);
+        if (ausleihen.alink == null) {
             return new ProlongAllResult(Status.ERROR);
         }
 
-        doc = htmlGet(alink);
+        doc = htmlGet(ausleihen.alink);
 
         List<NameValuePair> form = new ArrayList<>();
         for (Element input : doc.select("input, select")) {
@@ -1454,18 +1451,6 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
         // Ausleihen
         Ausleihen ausleihen = getAusleihen(doc);
         List<LentItem> lent = new ArrayList<>();
-        /*
-        String alink = null;
-        int anum = 0;
-        for (Element tr : getServiceElements(doc)) {
-            if (tr.select("a").size() == 1) {
-                if (tr.select("a").first().absUrl("href").contains("sp=SZA")) {
-                    alink = tr.select("a").first().absUrl("href");
-                    anum = Integer.parseInt(tr.child(0).text().replaceAll("[^\\d]", "").trim());
-                }
-            }
-        }
-        */
 
         if (ausleihen.alink != null) {
             Document adoc = htmlGet(ausleihen.alink);
