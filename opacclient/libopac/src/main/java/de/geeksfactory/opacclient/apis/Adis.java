@@ -1847,9 +1847,10 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
         setTitleAndType(item, mediaType, title);
 
         // Autor
-        if (split.length > indexTitle) {
+        int indexAutor = indexTitle+1;
+        if (indexAutor < split.length) {
             item.setAuthor(
-                    split[indexTitle+1].replaceFirst("([^:;\n]+)[:;\n](.*)$", "$1").trim());
+                    split[indexAutor].replaceFirst("([^:;\n]+)[:;\n](.*)$", "$1").trim());
         }
 
         // id is always the last one...
