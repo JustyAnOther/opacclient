@@ -767,9 +767,13 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
 
             if (desc.contains("Titel") && res.getTitle() == null) {
                 res.setTitle(value.split("[:/;]")[0].trim());
-            }
-            if (desc.contains("Verfasser") && res.getAuthor() == null) {
-                res.setAuthor(value);
+
+                if( (res.getMediaType() == MediaType.DVD) && (res.getAuthor() == null)) {
+                    String regie = stripRegie(value);
+                    if (regie != null) {
+                        res.setAuthor(regie);
+                    }
+                }
             }
             if (desc.contains("Medienart") && res.getMediaType() == null) {
                 MediaType mediaType = checkType(value, true);
@@ -777,9 +781,13 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
                     try {
                         res.setMediaType(mediaType);
                     } catch(IllegalArgumentException e) {
-                        LOGGER.log(Level.WARNING, e.getMessage() + " " + value);
+                        LOGGER.log(Level.WARNING, e.getMessage());
                     }
                 }
+            }
+
+            if (desc.contains("Verfasser") && res.getAuthor() == null) {
+                res.setAuthor(stripAuthor(value));
             }
         }
 
@@ -855,6 +863,35 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
             // an id,< we just can not use it.
         }
         return res;
+    }
+
+    private String stripAuthor(String value) {
+        Pattern pattern = Pattern
+                // falls Jahreszahlen am Ende stehen müssten, z. B.
+                // Clark, Christopher M., 1960-
+//              .compile("(.*)[0-9]{4,4}-([0-9]{4,4})*\\s*$");
+                // nach Jahreszahlen interessiert nicht., z.B.
+                // Händel, Georg Friedrich, 1685-1759 [Komponist/in]
+                .compile("(.*)[0-9]{4,4}-([0-9]{4,4}){0,1}.*");
+
+        Matcher nameMatcher = pattern.matcher(value);
+        if (nameMatcher.find()) {
+            String name = nameMatcher.group(1).trim();
+            if (name.endsWith(",")) {
+                return name.substring(0, name.length()-1);
+            }
+            return name;
+        }
+        return value;
+    }
+
+    private String stripRegie(String value) {
+        Pattern pattern = Pattern.compile("Regie:[^.]*");
+        Matcher matcher = pattern.matcher(value);
+        if (matcher.find()) {
+            return matcher.group(0).trim();
+        }
+        return value;
     }
 
     @Override
