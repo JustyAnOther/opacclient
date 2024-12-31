@@ -24,8 +24,11 @@
         android:layout_toRightOf="@id/ivMediaType"
         android:layout_toLeftOf="@id/tvStatus"
         android:padding="5dp"
+        android:ellipsize="end"
+        android:maxLines="1"
         tools:text="Harry Potter and the Philosopher's stone"
         android:textColor="?android:attr/textColorPrimary"
+        android:textSize="16sp"
         android:textAppearance="?android:attr/textAppearanceMedium"/>
 
     <TextView

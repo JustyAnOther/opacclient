@@ -29,12 +29,16 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.database.Cursor;
+import android.graphics.Typeface;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import androidx.loader.app.LoaderManager;
 import androidx.preference.PreferenceManager;
 import android.text.Html;
+import android.text.SpannableStringBuilder;
+import android.text.TextUtils;
+import android.text.style.StyleSpan;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.Menu;
@@ -114,6 +118,7 @@ public class StarredFragment extends Fragment implements
     private static final String JSON_STARRED_LIST = "starred_list";
     private static final String JSON_ITEM_MNR = "item_mnr";
     private static final String JSON_ITEM_TITLE = "item_title";
+    private static final String JSON_ITEM_AUTHOR = "item_author";
     private static final String JSON_ITEM_MEDIATYPE = "item_mediatype";
     private static final String JSON_ITEM_BRANCHES = "item_branches";
     private static final int REQUEST_CODE_EXPORT = 123;
@@ -589,7 +594,7 @@ public class StarredFragment extends Fragment implements
 
         final String bib = app.getLibrary().getIdent();
         final String[] projection = {"starred.id AS _id", "medianr", "starred.bib AS bib", "title", "mediatype"
-                , "id_branch", "status", "statusTime", "returnDate"};
+                , "author", "id_branch", "status", "statusTime", "returnDate"};
 
         if (currentFilterBranchId == FILTER_BRANCH_ALL) {
             // Nur auf Library selektieren
@@ -831,11 +836,13 @@ public class StarredFragment extends Fragment implements
                     }
                     dataSource.star(entry.optString(JSON_ITEM_MNR),
                             entry.getString(JSON_ITEM_TITLE), bib,
+                            entry.getString(JSON_ITEM_AUTHOR),
                             mediatype != null ? SearchResult.MediaType.valueOf(mediatype) :
                                     null, copies);
                 } else {
                     dataSource.star(entry.optString(JSON_ITEM_MNR),
                             entry.getString(JSON_ITEM_TITLE), bib,
+                            entry.getString(JSON_ITEM_AUTHOR),
                             mediatype != null ? SearchResult.MediaType.valueOf(mediatype) :
                                     null);
                 }
@@ -1032,7 +1039,16 @@ public class StarredFragment extends Fragment implements
 
             TextView tv = (TextView) view.findViewById(R.id.tvTitle);
             if (item.getTitle() != null) {
-                tv.setText(Html.fromHtml(item.getTitle()));
+                SpannableStringBuilder builder = new SpannableStringBuilder();
+                if (item.getTitle() != null) {
+                    builder.append(item.getTitle());
+                    builder.setSpan(new StyleSpan(Typeface.BOLD), 0, item.getTitle().length(), 0);
+                    if (!TextUtils.isEmpty(item.getAuthor())) builder.append(". ");
+                }
+                if (!TextUtils.isEmpty(item.getAuthor())) {
+                    builder.append(item.getAuthor());
+                }
+                tv.setText(builder);
             } else {
                 tv.setText("");
             }

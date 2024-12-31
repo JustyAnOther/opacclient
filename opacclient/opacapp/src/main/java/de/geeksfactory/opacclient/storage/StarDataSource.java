@@ -69,12 +69,17 @@ public class StarDataSource {
         } catch (IllegalArgumentException e) {
             // Do not crash on invalid media types stored in the database
         }
+        int iAuthor = cursor.getColumnIndex("author");
+        if (iAuthor >= 0) {
+            String author = cursor.getString(iAuthor);
+            item.setAuthor(author);
+        }
     }
 
-    public long star(String nr, String title, String bib, SearchResult.MediaType mediaType, List<Copy> copies) {
+    public long star(String nr, String title, String bib, String author, SearchResult.MediaType mediaType, List<Copy> copies) {
 
         // star
-        int starId = star(nr, title, bib, mediaType);
+        int starId = star(nr, title, bib, author, mediaType);
 
         insertBranches(bib, starId, copies);
         return starId;
@@ -173,10 +178,11 @@ public class StarDataSource {
         return map;
     }
 
-    public int star(String nr, String title, String bib, SearchResult.MediaType mediaType) {
+    public int star(String nr, String title, String bib, String author, SearchResult.MediaType mediaType) {
         ContentValues values = new ContentValues();
         values.put("medianr", nr);
         values.put("title", title);
+        values.put("author", author);
         values.put("bib", bib);
         values.put("mediatype", mediaType != null ? mediaType.toString() : null);
         Uri uri = context.getContentResolver()
@@ -220,7 +226,7 @@ public class StarDataSource {
             selection = StarDatabase.STAR_WHERE_LIB_BRANCH;
         }
 
-        final String[] projection = {"id AS _id", "medianr", "bib", "title", "mediatype"
+        final String[] projection = {"id AS _id", "medianr", "bib", "title", "mediatype", "author"
                 , "id_branch", "status", "statusTime", "returnDate"};
 
         Cursor cursor = context.getContentResolver().query(
@@ -242,10 +248,10 @@ public class StarDataSource {
     public static StarBranchItem cursorToStarBranchItem(Cursor cursor) {
         StarBranchItem item = new StarBranchItem();
         mapCursoToItem(cursor, item);
-        item.setBranchId(cursor.getLong(5));
-        item.setStatus(cursor.getString(6));
-        item.setStatusTime(cursor.getLong(7));
-        item.setReturnDate(cursor.getLong(8));
+        item.setBranchId(cursor.getLong(6));
+        item.setStatus(cursor.getString(7));
+        item.setStatusTime(cursor.getLong(8));
+        item.setReturnDate(cursor.getLong(9));
         return item;
     }
 

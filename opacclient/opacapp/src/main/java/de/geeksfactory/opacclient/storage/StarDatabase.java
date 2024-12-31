@@ -2,21 +2,21 @@
  * Copyright (C) 2013 by Raphael Michel under the MIT license:
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), 
- * to deal in the Software without restriction, including without limitation 
- * the rights to use, copy, modify, merge, publish, distribute, sublicense, 
- * and/or sell copies of the Software, and to permit persons to whom the Software 
+ * of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the Software
  * is furnished to do so, subject to the following conditions:
  *
- * The above copyright notice and this permission notice shall be included in 
+ * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
  *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. 
- * IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, 
- * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, 
- * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+ * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  */
 package de.geeksfactory.opacclient.storage;
@@ -31,7 +31,8 @@ public class StarDatabase extends SQLiteOpenHelper {
     public static final String STAR_TABLE = "starred";
     private static final String STAR_TABLE_CREATE = "create table " + STAR_TABLE
             + " ( id integer primary key autoincrement," + " medianr text,"
-            + " bib text," + " title text," + " mediatype text"
+            + " bib text," + " title text," + " mediatype text,"
+            + " author text,"
             + " );";
 
     /* table for branches, which are used by starred-media-items */
@@ -71,7 +72,7 @@ public class StarDatabase extends SQLiteOpenHelper {
     public static final String BRANCH_WHERE_ID = "id = ?";
 
     private static final String DATABASE_NAME = "starred.db";
-    private static final int DATABASE_VERSION = 7; // REPLACE ONUPGRADE IF YOU
+    private static final int DATABASE_VERSION = 8; // REPLACE ONUPGRADE IF YOU
 
     public StarDatabase(Context context) {
         super(context, DATABASE_NAME, null, DATABASE_VERSION);
@@ -103,6 +104,9 @@ public class StarDatabase extends SQLiteOpenHelper {
             if (oldVersion <7) {
                 db.execSQL(BRANCH_TABLE_CREATE);
                 db.execSQL(STAR_BRANCH_TABLE_CREATE);
+            }
+            if (oldVersion <8) {
+                db.execSQL("alter table " + STAR_TABLE + " add column author text");
             }
         } else {
             // oldVersion < 5

@@ -754,19 +754,32 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
             if (tr.children().size() < 2) {
                 continue;
             }
-            String title = tr.child(0).text().trim();
+            String desc = tr.child(0).text().trim();
             String value = tr.child(1).text().trim();
             if (value.contains("hier klicken") || value.startsWith("zur ") ||
-                    title.contains("URL")) {
-                res.addDetail(new Detail(title, tr.child(1).select("a").first().absUrl("href")));
+                    desc.contains("URL")) {
+                res.addDetail(new Detail(desc, tr.child(1).select("a").first().absUrl("href")));
             } else if("Zitierlink".equals(value)) {
-                // nicht in Detail übernhemen, unnützt
+                // nicht in Detail übernehmen, unnützt
             } else {
-                res.addDetail(new Detail(title, value));
+                res.addDetail(new Detail(desc, value));
             }
 
-            if (title.contains("Titel") && res.getTitle() == null) {
+            if (desc.contains("Titel") && res.getTitle() == null) {
                 res.setTitle(value.split("[:/;]")[0].trim());
+            }
+            if (desc.contains("Verfasser") && res.getAuthor() == null) {
+                res.setAuthor(value);
+            }
+            if (desc.contains("Medienart") && res.getMediaType() == null) {
+                MediaType mediaType = checkType(value, true);
+                if (mediaType != null) {
+                    try {
+                        res.setMediaType(mediaType);
+                    } catch(IllegalArgumentException e) {
+                        LOGGER.log(Level.WARNING, e.getMessage() + " " + value);
+                    }
+                }
             }
         }
 
@@ -1862,7 +1875,7 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
      *
      * @param text
      * @param only true: text soll nur aus Mediatype(key) und [] bestehen
-     *             false: text soll mit mit [Mediatype(key)] beginnen
+     *             false: text soll mit [Mediatype(key)] beginnen
      * @return
      */
     private static MediaType checkType(String text, boolean only) {

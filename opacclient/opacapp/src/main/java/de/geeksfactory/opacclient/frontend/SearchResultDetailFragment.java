@@ -635,16 +635,16 @@ public class SearchResultDetailFragment extends Fragment
     }
 
     @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
+    public boolean onOptionsItemSelected(MenuItem menuItem) {
 
         final String bib = getLibraryIdent();
-        if (item.getItemId() == R.id.action_reservation) {
+        if (menuItem.getItemId() == R.id.action_reservation) {
             reservationStart();
             return true;
-        } else if (item.getItemId() == R.id.action_lendebook) {
+        } else if (menuItem.getItemId() == R.id.action_lendebook) {
             bookingStart();
             return true;
-        } else if (item.getItemId() == R.id.action_tocollection) {
+        } else if (menuItem.getItemId() == R.id.action_tocollection) {
             if (getActivity().getIntent().getBooleanExtra("from_collection",
                     false)) {
                 getActivity().finish();
@@ -657,7 +657,7 @@ public class SearchResultDetailFragment extends Fragment
                 getActivity().finish();
             }
             return true;
-        } else if (item.getItemId() == R.id.action_share) {
+        } else if (menuItem.getItemId() == R.id.action_share) {
             if (getItem() == null) {
                 Toast toast = Toast.makeText(getActivity(),
                         getString(R.string.share_wait), Toast.LENGTH_SHORT);
@@ -831,7 +831,7 @@ public class SearchResultDetailFragment extends Fragment
             }
 
             return true;
-        } else if (item.getItemId() == R.id.action_star) {
+        } else if (menuItem.getItemId() == R.id.action_star) {
             StarDataSource star = new StarDataSource(getActivity());
             if (getItem() == null) {
                 Toast toast = Toast.makeText(getActivity(),
@@ -847,13 +847,13 @@ public class SearchResultDetailFragment extends Fragment
                 } else {
                     if (star.isStarredTitle(bib, title)) {
                         star.remove(star.getItemByTitle(bib, title));
-                        item.setIcon(R.drawable.ic_star_0_white_24dp);
+                        menuItem.setIcon(R.drawable.ic_star_0_white_24dp);
                     } else {
-                        star.star(null, title, bib, getItem().getMediaType(), getItem().getCopies());
+                        star.star(null, title, bib, getItem().getAuthor(), getItem().getMediaType(), getItem().getCopies());
                         Toast toast = Toast.makeText(getActivity(),
                                 getString(R.string.starred), Toast.LENGTH_SHORT);
                         toast.show();
-                        item.setIcon(R.drawable.ic_star_1_white_24dp);
+                        menuItem.setIcon(R.drawable.ic_star_1_white_24dp);
                     }
                 }
             } else {
@@ -861,17 +861,17 @@ public class SearchResultDetailFragment extends Fragment
                 final String id = getItem().getId();
                 if (star.isStarred(bib, id)) {
                     star.remove(star.getItem(bib, id));
-                    item.setIcon(R.drawable.ic_star_0_white_24dp);
+                    menuItem.setIcon(R.drawable.ic_star_0_white_24dp);
                 } else {
-                    star.star(id, title, bib, getItem().getMediaType(), getItem().getCopies());
+                    star.star(id, title, bib, getItem().getAuthor(), getItem().getMediaType(), getItem().getCopies());
                     Toast toast = Toast.makeText(getActivity(),
                             getString(R.string.starred), Toast.LENGTH_SHORT);
                     toast.show();
-                    item.setIcon(R.drawable.ic_star_1_white_24dp);
+                    menuItem.setIcon(R.drawable.ic_star_1_white_24dp);
                 }
             }
             return true;
-        } else if (item.getItemId() == R.id.action_print) {
+        } else if (menuItem.getItemId() == R.id.action_print) {
             if (getItem() == null) {
                 Toast toast = Toast.makeText(getActivity(),
                         getString(R.string.print_wait), Toast.LENGTH_SHORT);
@@ -884,7 +884,7 @@ public class SearchResultDetailFragment extends Fragment
 
             return true;
         } else {
-            return super.onOptionsItemSelected(item);
+            return super.onOptionsItemSelected(menuItem);
         }
     }
 
