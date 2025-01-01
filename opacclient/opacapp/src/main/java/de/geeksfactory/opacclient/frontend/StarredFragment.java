@@ -35,7 +35,7 @@ import android.os.AsyncTask;
 import android.os.Bundle;
 import androidx.loader.app.LoaderManager;
 import androidx.preference.PreferenceManager;
-import android.text.Html;
+
 import android.text.SpannableStringBuilder;
 import android.text.TextUtils;
 import android.text.style.StyleSpan;
@@ -1028,7 +1028,7 @@ public class StarredFragment extends Fragment implements
     private class ItemListAdapter extends SimpleCursorAdapter {
 
         public ItemListAdapter() {
-            super(getActivity(), R.layout.listitem_starred, null,
+            super(getActivity(), R.layout.listitem_starred_item, null,
                     new String[]{"bib"}, null, 0);
         }
 
