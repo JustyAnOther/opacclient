@@ -55,7 +55,9 @@ public class StarBranchItem extends Starred {
                 + (getTitle() == null ? "" : ", title=" + getTitle())
                 + (getMediaType() == null ? "" : ", mediaType=" + getMediaType().toString())
                 + ", branchId=" + branchId
-                + (returnDate>0  ? "" : "returnDate = " + returnDate)
+                + ", status=" + status
+                + (statusTime==0 ? "": ", statusTime/Date=" + getStatusDate() )
+                + (returnDate>0  ? "" : ", returnDate = " + returnDate)
                 + (getMNr() == null ?  "" : ", mnr=" + getMNr())
                 + "]";
     }

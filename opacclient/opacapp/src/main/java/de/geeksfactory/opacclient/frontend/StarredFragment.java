@@ -59,6 +59,7 @@ import android.widget.Toast;
 
 import com.google.android.material.snackbar.Snackbar;
 
+import org.joda.time.LocalDate;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
 import org.json.JSONArray;
@@ -89,6 +90,7 @@ import de.geeksfactory.opacclient.R;
 import de.geeksfactory.opacclient.frontend.OpacActivity.AccountSelectedListener;
 import de.geeksfactory.opacclient.objects.Account;
 import de.geeksfactory.opacclient.objects.Copy;
+import de.geeksfactory.opacclient.objects.Detail;
 import de.geeksfactory.opacclient.objects.DetailedItem;
 import de.geeksfactory.opacclient.objects.SearchResult;
 import de.geeksfactory.opacclient.searchfields.DropdownSearchField;
@@ -120,6 +122,8 @@ public class StarredFragment extends Fragment implements
     private static final String JSON_ITEM_TITLE = "item_title";
     private static final String JSON_ITEM_AUTHOR = "item_author";
     private static final String JSON_ITEM_MEDIATYPE = "item_mediatype";
+    private static final String JSON_ITEM_STAR_DATE = "item_star_date";
+    private static final String JSON_ITEM_REMARK = "item_remark";
     private static final String JSON_ITEM_BRANCHES = "item_branches";
     private static final int REQUEST_CODE_EXPORT = 123;
     private static final int REQUEST_CODE_IMPORT = 124;
@@ -593,14 +597,12 @@ public class StarredFragment extends Fragment implements
         }
 
         final String bib = app.getLibrary().getIdent();
-        final String[] projection = {"starred.id AS _id", "medianr", "starred.bib AS bib", "title", "mediatype"
-                , "author", "id_branch", "status", "statusTime", "returnDate"};
 
         if (currentFilterBranchId == FILTER_BRANCH_ALL) {
             // Nur auf Library selektieren
             return new CursorLoader(getActivity(),
                     StarContentProvider.STAR_JOIN_STAR_BRANCH_URI,
-                    projection, // StarDatabase.COLUMNS,
+                    StarDataSource.STAR_BRANCH_PROJECTION,
                     StarDatabase.STAR_WHERE_LIB,
                     new String[]{bib},
                     null);
@@ -608,7 +610,7 @@ public class StarredFragment extends Fragment implements
             // Auf Library und id_branch = null selektieren
             return new CursorLoader(getActivity(),
                     StarContentProvider.STAR_JOIN_STAR_BRANCH_URI,
-                    projection,
+                    StarDataSource.STAR_BRANCH_PROJECTION,
                     StarDatabase.STAR_WHERE_LIB_BRANCH_IS_NULL,
                     new String[]{bib},
                     null);
@@ -616,7 +618,7 @@ public class StarredFragment extends Fragment implements
             // Auf Library und id_branch selektieren
             return new CursorLoader(getActivity(),
                     StarContentProvider.STAR_JOIN_STAR_BRANCH_URI,
-                    projection,
+                    StarDataSource.STAR_BRANCH_PROJECTION,
                     StarDatabase.STAR_WHERE_LIB_BRANCH,
                     new String[]{bib, Integer.toString(currentFilterBranchId)},
                     null);
@@ -758,8 +760,8 @@ public class StarredFragment extends Fragment implements
                 Snackbar.LENGTH_SHORT).show();
     }
 
-    private void showImportError() {
-        Snackbar.make(getView(), R.string.failed_importing_file,
+    private void showImportError(String detailMessage) {
+        Snackbar.make(getView(), getView().getResources().getString(R.string.failed_importing_file) + ": " + detailMessage,
                 Snackbar.LENGTH_SHORT).show();
     }
 
@@ -786,7 +788,12 @@ public class StarredFragment extends Fragment implements
                 JSONObject item = new JSONObject();
                 item.put(JSON_ITEM_MNR, libItem.getMNr());
                 item.put(JSON_ITEM_TITLE, libItem.getTitle());
+                item.put(JSON_ITEM_AUTHOR, libItem.getAuthor());
+                item.put(JSON_ITEM_STAR_DATE, libItem.getStarDate());
                 item.put(JSON_ITEM_MEDIATYPE, libItem.getMediaType());
+                if (libItem.getRemark() != null) {
+                    item.put(JSON_ITEM_REMARK, libItem.getRemark());
+                }
 
                 List<String> branches = data.getBranches(libItem.getId());
                 if ((branches != null) && (!branches.isEmpty())) {
@@ -825,8 +832,9 @@ public class StarredFragment extends Fragment implements
 
                 String mediatype = entry.optString(JSON_ITEM_MEDIATYPE, null);
 
+                List<Copy> copies = null;
                 if (entry.has(JSON_ITEM_BRANCHES)) {
-                    List<Copy> copies = new ArrayList<Copy>();
+                    copies = new ArrayList<Copy>();
                     JSONArray branchItems = entry.getJSONArray(JSON_ITEM_BRANCHES);
                     for (int j = 0; j < branchItems.length(); j++) {
                         String branch = branchItems.getString(j);
@@ -834,18 +842,15 @@ public class StarredFragment extends Fragment implements
                         copy.setBranch(branch);
                         copies.add(copy);
                     }
-                    dataSource.star(entry.optString(JSON_ITEM_MNR),
-                            entry.getString(JSON_ITEM_TITLE), bib,
-                            entry.getString(JSON_ITEM_AUTHOR),
-                            mediatype != null ? SearchResult.MediaType.valueOf(mediatype) :
-                                    null, copies);
-                } else {
-                    dataSource.star(entry.optString(JSON_ITEM_MNR),
-                            entry.getString(JSON_ITEM_TITLE), bib,
-                            entry.getString(JSON_ITEM_AUTHOR),
-                            mediatype != null ? SearchResult.MediaType.valueOf(mediatype) :
-                                    null);
                 }
+                String starDate = entry.optString(JSON_ITEM_STAR_DATE, null);
+                dataSource.star(entry.optString(JSON_ITEM_MNR),
+                        entry.getString(JSON_ITEM_TITLE), bib,
+                        entry.optString(JSON_ITEM_AUTHOR, null),
+                        ((starDate == null)||(starDate.isEmpty()))? null : new LocalDate(starDate),
+                        mediatype == null ? null : SearchResult.MediaType.valueOf(mediatype),
+                        entry.optString(JSON_ITEM_REMARK, null),
+                        copies);
             }
         }
     }
@@ -921,10 +926,10 @@ public class StarredFragment extends Fragment implements
                     Snackbar.make(getView(), R.string.info_starred_updated,
                             Snackbar.LENGTH_SHORT).show();
                 } else {
-                    showImportError();
+                    showImportError("InputStream is null");
                 }
             } catch (JSONException | IOException e) {
-                showImportError();
+                showImportError(e.getMessage());
             } catch (WrongFileFormatException e) {
                 showImportWrongFormatError();
             } finally {
@@ -1037,7 +1042,7 @@ public class StarredFragment extends Fragment implements
 
             StarBranchItem item = StarDataSource.cursorToStarBranchItem(cursor);
 
-            TextView tv = (TextView) view.findViewById(R.id.tvTitle);
+            TextView tv = (TextView) view.findViewById(R.id.tvTitleAndAuthor);
             if (item.getTitle() != null) {
                 SpannableStringBuilder builder = new SpannableStringBuilder();
                 if (item.getTitle() != null) {
@@ -1051,6 +1056,15 @@ public class StarredFragment extends Fragment implements
                 tv.setText(builder);
             } else {
                 tv.setText("");
+            }
+
+            TextView tvStarDate = (TextView) view.findViewById(R.id.tvStarDate);
+            if (item.getStarDate() == null) {
+                tvStarDate.setVisibility(View.GONE);
+            } else {
+                DateTimeFormatter fmt = DateTimeFormat.shortDate();
+                tvStarDate.setText(fmt.print(item.getStarDate()));
+                tvStarDate.setVisibility(View.VISIBLE);
             }
 
             TextView tvStatus = (TextView) view.findViewById(R.id.tvStatus);
@@ -1070,7 +1084,7 @@ public class StarredFragment extends Fragment implements
                     tvStatus.setVisibility(View.VISIBLE);
                 } else {
                     if (item.isAusleihbar()) {
-                        tvStatus.setVisibility(View.INVISIBLE);
+                        tvStatus.setVisibility(View.GONE);
                         ivStatus.setVisibility(View.VISIBLE);
                         ivStatus.setImageResource(R.drawable.status_light_green_check);
                     } else {
@@ -1088,7 +1102,7 @@ public class StarredFragment extends Fragment implements
             } else {
                 // items zu allen Branches werden angezeigt
                 // in diesem Fall kein Status beim item anzeigen
-                tvStatus.setVisibility(View.INVISIBLE);
+                tvStatus.setVisibility(View.GONE);
                 ivStatus.setVisibility(View.GONE);
             }
 
@@ -1115,11 +1129,20 @@ public class StarredFragment extends Fragment implements
     }
 
     private class FetchBranchesResult {
-        int starId;
-        List<Copy> copies;
-        public FetchBranchesResult(int starId, List<Copy> copies) {
-            this.starId = starId;
-            this.copies = copies;
+        Starred starred;
+        // int starId;
+        // List<Copy> copies;
+        DetailedItem detailedItem;
+        public FetchBranchesResult(Starred starred, DetailedItem di) {
+            this.starred = starred;
+            // this.copies = copies;
+            this.detailedItem = di;
+        }
+        List<Copy> getCopies() {
+            return detailedItem.getCopies();
+        }
+        int getStarId() {
+            return starred.getId();
         }
     }
 
@@ -1171,11 +1194,7 @@ public class StarredFragment extends Fragment implements
                     publishProgress(++nProgress);
 
                     DetailedItem di = app.getApi().getResultById(starred.getMNr(), homebranch);
-                    // MediaType auch setzen??
-                    if (di.getMediaType() == null && (starred.getMediaType() != null)) {
-                        di.setMediaType(starred.getMediaType());
-                    }
-                    res.add(new FetchBranchesResult(starred.getId(), di.getCopies()));
+                    res.add(new FetchBranchesResult(starred, di));
                 }
                 success = true;
                 return res;
@@ -1214,14 +1233,20 @@ public class StarredFragment extends Fragment implements
 
             logDebug("FetchBranchesTask.onPostExecute res.size = %s", res.size());
             for (FetchBranchesResult itemRes: res)  {
-                List<Copy> copies = itemRes.copies;
+
+                final String author = itemRes.detailedItem.getAuthor();
+                if ((author != null) && (itemRes.starred.getAuthor() == null) ) {
+                    dataSource.updateAuthor(itemRes.getStarId(), author);
+                }
+
+                List<Copy> copies = itemRes.getCopies();
                 if ((copies == null) || (copies.isEmpty())) {
                     // TODO: Toast?
                 } else {
                     // Branches updaten/inserten
                     logDebug("FetchBranchesTask.onPostExecute starId = %s, copies.size = %s"
-                            , itemRes.starId, copies.size());
-                    dataSource.insertBranches(bib, itemRes.starId, copies);
+                            , itemRes.getStarId(), copies.size());
+                    dataSource.insertBranches(bib, itemRes.getStarId(), copies);
                 }
             }
 

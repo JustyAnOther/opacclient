@@ -21,6 +21,8 @@
  */
 package de.geeksfactory.opacclient.storage;
 
+import org.joda.time.LocalDate;
+
 import de.geeksfactory.opacclient.objects.SearchResult;
 
 /**
@@ -35,11 +37,29 @@ public class Starred {
     private String title;
     private String author;
     private SearchResult.MediaType mediaType;
+    private LocalDate starDate;
+    private String remark;
+
+    public LocalDate getStarDate() {
+        return starDate;
+    }
+
+    public void setStarDate(LocalDate starDate) {
+        this.starDate = starDate;
+    }
+
+    public String getRemark() {
+        return remark;
+    }
+
+    public void setRemark(String remark) {
+        this.remark = remark;
+    }
 
     @Override
     public String toString() {
         return "Starred [id=" + id + ", mnr=" + mnr + ", title=" + title + ", mediaType=" +
-                mediaType.toString() + "]";
+                mediaType.toString() + ", starDate=" + starDate + ", remark=" + remark +  "]";
     }
 
     /**

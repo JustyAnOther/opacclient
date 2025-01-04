@@ -26,6 +26,7 @@ import android.content.ContentValues;
 import android.database.Cursor;
 import android.net.Uri;
 
+import org.joda.time.LocalDate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,17 +47,45 @@ public class StarDataSource {
 
     private final Activity context;
 
+    private static final String[] STAR_PROJECTION = {
+            "id AS _id"
+            , "medianr"
+            , "bib"
+            , "title"
+            , "mediatype"
+            , "author"
+            , "star_date"
+            , "remark"
+    };
+
+    // Achtung wie STAR_PROJECTION beginnen, da gemeinsam mapCursorTo-Methoden
+    public static final String[] STAR_BRANCH_PROJECTION = {
+            "id AS _id" // 0
+            , "medianr" // 1
+            , "bib"     // 2
+            , "title"   // 3
+            , "mediatype"   // 4
+            , "author"      // 5
+            , "star_date"   // 6
+            , "remark"      // 7
+            // ab hier Join-Spalten
+            , "id_branch"   // 8
+            , "status"      // 9
+            , "statusTime"  // 10
+            , "returnDate"  // 11
+    };
+
     public StarDataSource(Activity context) {
         this.context = context;
     }
 
     public static Starred cursorToItem(Cursor cursor) {
         Starred item = new Starred();
-        mapCursoToItem(cursor, item);
+        mapCursoToStarItem(cursor, item);
         return item;
     }
 
-    private static void mapCursoToItem(Cursor cursor, Starred item) {
+    private static int mapCursoToStarItem(Cursor cursor, Starred item) {
         item.setId(cursor.getInt(0));
         item.setMNr(cursor.getString(1));
         // columnIndex 2 = bib; no matching field, interessiert nicht
@@ -69,21 +98,30 @@ public class StarDataSource {
         } catch (IllegalArgumentException e) {
             // Do not crash on invalid media types stored in the database
         }
-        int iAuthor = cursor.getColumnIndex("author");
-        if (iAuthor >= 0) {
-            String author = cursor.getString(iAuthor);
-            item.setAuthor(author);
+
+        item.setAuthor(cursor.getString(5));
+
+        // siehe projection in onCreateLoader in StarredFragment
+        String starDate = cursor.getString(6);
+        if (starDate !=null) {
+            item.setStarDate(LocalDate.parse(starDate));
         }
+
+        item.setRemark(cursor.getString(7));
+
+        return 8;
     }
 
-    public long star(String nr, String title, String bib, String author, SearchResult.MediaType mediaType, List<Copy> copies) {
-
-        // star
-        int starId = star(nr, title, bib, author, mediaType);
-
-        insertBranches(bib, starId, copies);
-        return starId;
+    public static StarBranchItem cursorToStarBranchItem(Cursor cursor) {
+        StarBranchItem item = new StarBranchItem();
+        int i = mapCursoToStarItem(cursor, item);
+        item.setBranchId(cursor.getLong(i++));
+        item.setStatus(cursor.getString(i++));
+        item.setStatusTime(cursor.getLong(i++));
+        item.setReturnDate(cursor.getLong(i++));
+        return item;
     }
+
 
     public void insertBranches(String bib, int starId, List<Copy> copies) {
 
@@ -178,13 +216,34 @@ public class StarDataSource {
         return map;
     }
 
-    public int star(String nr, String title, String bib, String author, SearchResult.MediaType mediaType) {
+    public long star(String nr, String title, String bib, String author, LocalDate starDate, SearchResult.MediaType mediaType, String remark, List<Copy> copies) {
+
+        // star
+        int starId = star(nr, title, bib, author, starDate, mediaType, remark);
+
+        if ((copies != null) && !copies.isEmpty()) {
+            insertBranches(bib, starId, copies);
+        }
+        return starId;
+    }
+
+    public int star(String nr, String title, String bib, String author, LocalDate starDate, SearchResult.MediaType mediaType, String remark) {
         ContentValues values = new ContentValues();
         values.put("medianr", nr);
         values.put("title", title);
         values.put("author", author);
         values.put("bib", bib);
         values.put("mediatype", mediaType != null ? mediaType.toString() : null);
+        if (starDate == null) {
+            values.putNull("star_date");
+        } else {
+            values.put("star_date", starDate.toString() );
+        }
+        if (remark == null) {
+            values.putNull("remark");
+        } else {
+            values.put("remark", remark);
+        }
         Uri uri = context.getContentResolver()
                .insert(((OpacClient) context.getApplication()).getStarProviderStarUri(), values);
         return getId(uri);
@@ -197,7 +256,7 @@ public class StarDataSource {
                 .getContentResolver()
                 .query(((OpacClient) context.getApplication())
                                 .getStarProviderStarUri(),
-                        StarDatabase.COLUMNS, StarDatabase.STAR_WHERE_LIB,
+                        STAR_PROJECTION, StarDatabase.STAR_WHERE_LIB,
                         selA, null);
 
         cursor.moveToFirst();
@@ -226,12 +285,11 @@ public class StarDataSource {
             selection = StarDatabase.STAR_WHERE_LIB_BRANCH;
         }
 
-        final String[] projection = {"id AS _id", "medianr", "bib", "title", "mediatype", "author"
-                , "id_branch", "status", "statusTime", "returnDate"};
-
+        // Achtung Abhängigkeit zu cursor.get(int )
+        // in mapCursorToStarItem und mapCursorToStarBranchItem
         Cursor cursor = context.getContentResolver().query(
             StarContentProvider.STAR_JOIN_STAR_BRANCH_URI,
-            projection, selection, selArgs, null);
+            STAR_BRANCH_PROJECTION, selection, selArgs, null);
 
         List<StarBranchItem> items = new ArrayList<>();
         cursor.moveToFirst();
@@ -245,23 +303,13 @@ public class StarDataSource {
         return items;
     }
 
-    public static StarBranchItem cursorToStarBranchItem(Cursor cursor) {
-        StarBranchItem item = new StarBranchItem();
-        mapCursoToItem(cursor, item);
-        item.setBranchId(cursor.getLong(6));
-        item.setStatus(cursor.getString(7));
-        item.setStatusTime(cursor.getLong(8));
-        item.setReturnDate(cursor.getLong(9));
-        return item;
-    }
-
     public Starred getItemByTitle(String bib, String title) {
         String[] selA = {bib, title};
         Cursor cursor = context
                 .getContentResolver()
                 .query(((OpacClient) context.getApplication())
                                 .getStarProviderStarUri(),
-                        StarDatabase.COLUMNS,
+                        STAR_PROJECTION,
                         StarDatabase.STAR_WHERE_TITLE_LIB, selA, null);
         Starred item = null;
 
@@ -281,7 +329,7 @@ public class StarDataSource {
                 .getContentResolver()
                 .query(((OpacClient) context.getApplication())
                                 .getStarProviderStarUri(),
-                        StarDatabase.COLUMNS, StarDatabase.STAR_WHERE_NR_LIB,
+                        STAR_PROJECTION, StarDatabase.STAR_WHERE_NR_LIB,
                         selA, null);
         Starred item = null;
 
@@ -322,7 +370,7 @@ public class StarDataSource {
                 .getContentResolver()
                 .query(((OpacClient) context.getApplication())
                                 .getStarProviderStarUri(),
-                        StarDatabase.COLUMNS, StarDatabase.STAR_WHERE_ID, selA,
+                        STAR_PROJECTION, StarDatabase.STAR_WHERE_ID, selA,
                         null);
         Starred item = null;
 
@@ -345,7 +393,7 @@ public class StarDataSource {
                 .getContentResolver()
                 .query(((OpacClient) context.getApplication())
                                 .getStarProviderStarUri(),
-                        StarDatabase.COLUMNS, StarDatabase.STAR_WHERE_NR_LIB,
+                        STAR_PROJECTION, StarDatabase.STAR_WHERE_NR_LIB,
                         selA, null);
         int c = cursor.getCount();
         cursor.close();
@@ -361,7 +409,7 @@ public class StarDataSource {
                 .getContentResolver()
                 .query(((OpacClient) context.getApplication())
                                 .getStarProviderStarUri(),
-                        StarDatabase.COLUMNS,
+                        STAR_PROJECTION,
                         StarDatabase.STAR_WHERE_TITLE_LIB, selA, null);
         int c = cursor.getCount();
         cursor.close();
@@ -395,6 +443,21 @@ public class StarDataSource {
                            cv, StarDatabase.STAR_WHERE_LIB,
                            new String[]{entry.getKey()});
         }
+    }
+
+    /**
+     * setzt Column Author zur starId
+     *
+     * @param id starId
+     * @param author to set
+     */
+    public void updateAuthor(int id, String author) {
+        ContentValues cv = new ContentValues();
+        cv.put("author", author);
+        context.getContentResolver()
+               .update(StarContentProvider.STAR_URI,
+                       cv, StarDatabase.STAR_WHERE_ID,
+                       new String[]{Integer.toString(id)});
     }
 
     /**

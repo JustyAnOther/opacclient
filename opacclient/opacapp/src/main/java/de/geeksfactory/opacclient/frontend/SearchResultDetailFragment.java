@@ -833,6 +833,7 @@ public class SearchResultDetailFragment extends Fragment
             return true;
         } else if (menuItem.getItemId() == R.id.action_star) {
             StarDataSource star = new StarDataSource(getActivity());
+            final String remark = null;
             if (getItem() == null) {
                 Toast toast = Toast.makeText(getActivity(),
                         getString(R.string.star_wait), Toast.LENGTH_SHORT);
@@ -849,7 +850,7 @@ public class SearchResultDetailFragment extends Fragment
                         star.remove(star.getItemByTitle(bib, title));
                         menuItem.setIcon(R.drawable.ic_star_0_white_24dp);
                     } else {
-                        star.star(null, title, bib, getItem().getAuthor(), getItem().getMediaType(), getItem().getCopies());
+                        star.star(null, title, bib, getItem().getAuthor(), new LocalDate(), getItem().getMediaType(), remark, getItem().getCopies());
                         Toast toast = Toast.makeText(getActivity(),
                                 getString(R.string.starred), Toast.LENGTH_SHORT);
                         toast.show();
@@ -863,7 +864,7 @@ public class SearchResultDetailFragment extends Fragment
                     star.remove(star.getItem(bib, id));
                     menuItem.setIcon(R.drawable.ic_star_0_white_24dp);
                 } else {
-                    star.star(id, title, bib, getItem().getAuthor(), getItem().getMediaType(), getItem().getCopies());
+                    star.star(id, title, bib, getItem().getAuthor(), new LocalDate(), getItem().getMediaType(), remark, getItem().getCopies());
                     Toast toast = Toast.makeText(getActivity(),
                             getString(R.string.starred), Toast.LENGTH_SHORT);
                     toast.show();

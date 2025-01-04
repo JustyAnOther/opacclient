@@ -32,7 +32,7 @@ public class StarDatabase extends SQLiteOpenHelper {
     private static final String STAR_TABLE_CREATE = "create table " + STAR_TABLE
             + " ( id integer primary key autoincrement," + " medianr text,"
             + " bib text," + " title text," + " mediatype text,"
-            + " author text,"
+            + " author text," + "star_date date ," + " remark text"
             + " );";
 
     /* table for branches, which are used by starred-media-items */
@@ -65,8 +65,6 @@ public class StarDatabase extends SQLiteOpenHelper {
     public static final String STAR_WHERE_LIB_BRANCH_IS_NULL = "bib = ? and id_branch is null";
     public static final String STAR_WHERE_TITLE_LIB = "bib = ? AND medianr IS NULL AND title = ?";
     public static final String STAR_WHERE_NR_LIB = "bib = ? AND medianr = ?";
-    public static final String[] COLUMNS = {"id AS _id", "medianr", "bib",
-            "title", "mediatype"};
 
     public static final String BRANCH_WHERE_LIB_NAME = "bib = ? and name = ?";
     public static final String BRANCH_WHERE_ID = "id = ?";
@@ -106,7 +104,11 @@ public class StarDatabase extends SQLiteOpenHelper {
                 db.execSQL(STAR_BRANCH_TABLE_CREATE);
             }
             if (oldVersion <8) {
-                db.execSQL("alter table " + STAR_TABLE + " add column author text");
+                db.execSQL("alter table " + STAR_TABLE
+                 +  " add column author text"
+                 + ", add column star_date date"
+                 + ", add column remark text"
+                );
             }
         } else {
             // oldVersion < 5
