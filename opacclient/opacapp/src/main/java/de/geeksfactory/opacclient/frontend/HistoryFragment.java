@@ -90,6 +90,7 @@ import de.geeksfactory.opacclient.storage.HistoryDatabase;
 import de.geeksfactory.opacclient.storage.HistoryItem;
 import de.geeksfactory.opacclient.storage.JsonSearchFieldDataSource;
 import de.geeksfactory.opacclient.utils.CompatibilityUtils;
+import de.geeksfactory.opacclient.utils.Utils;
 
 public class HistoryFragment extends Fragment implements
         LoaderCallbacks<Cursor>, AccountSelectedListener {
@@ -579,8 +580,9 @@ public class HistoryFragment extends Fragment implements
             intent.addCategory(Intent.CATEGORY_OPENABLE);
             // Create a file with the requested MIME type.
             intent.setType("application/json");
-            intent.putExtra(Intent.EXTRA_TITLE,
-                    "webopac_history_" + app.getLibrary().getIdent() + ".json");
+            final String filename = Utils.formatExportFilename("webopac_history"
+                    , app.getLibrary().getIdent() );
+            intent.putExtra(Intent.EXTRA_TITLE, filename);
             startActivityForResult(intent, REQUEST_CODE_EXPORT);
         } else {        // <android 4.4; share json as text
             intent = new Intent();

@@ -106,6 +106,7 @@ import de.geeksfactory.opacclient.storage.StarDataSource;
 import de.geeksfactory.opacclient.storage.StarDatabase;
 import de.geeksfactory.opacclient.storage.Starred;
 import de.geeksfactory.opacclient.utils.CompatibilityUtils;
+import de.geeksfactory.opacclient.utils.Utils;
 
 public class StarredFragment extends Fragment implements
         LoaderCallbacks<Cursor>, AccountSelectedListener {
@@ -738,8 +739,9 @@ public class StarredFragment extends Fragment implements
             intent.addCategory(Intent.CATEGORY_OPENABLE);
             // Create a file with the requested MIME type.
             intent.setType("application/json");
-            intent.putExtra(Intent.EXTRA_TITLE,
-                    "webopac_starred_" + app.getLibrary().getIdent() + ".json");
+            final String filename = Utils.formatExportFilename("webopac_starred"
+                    , app.getLibrary().getIdent() );
+            intent.putExtra(Intent.EXTRA_TITLE, filename);
             startActivityForResult(intent, REQUEST_CODE_EXPORT);
         } else {        // <android 4.4; share json as text
             intent = new Intent();
@@ -831,6 +833,7 @@ public class StarredFragment extends Fragment implements
                             entry.getString(JSON_ITEM_TITLE))) { //disallow dupes
 
                 String mediatype = entry.optString(JSON_ITEM_MEDIATYPE, null);
+                String remark = entry.optString(JSON_ITEM_REMARK, null);
 
                 List<Copy> copies = null;
                 if (entry.has(JSON_ITEM_BRANCHES)) {
@@ -849,7 +852,7 @@ public class StarredFragment extends Fragment implements
                         entry.optString(JSON_ITEM_AUTHOR, null),
                         ((starDate == null)||(starDate.isEmpty()))? null : new LocalDate(starDate),
                         mediatype == null ? null : SearchResult.MediaType.valueOf(mediatype),
-                        entry.optString(JSON_ITEM_REMARK, null),
+                        remark,
                         copies);
             }
         }
