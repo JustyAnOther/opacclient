@@ -2,6 +2,9 @@ package de.geeksfactory.opacclient.utils;
 
 import android.content.Context;
 
+import org.joda.time.LocalDate;
+import org.joda.time.format.DateTimeFormat;
+import org.joda.time.format.DateTimeFormatter;
 import org.json.JSONException;
 
 import java.io.BufferedReader;
@@ -62,5 +65,14 @@ public class Utils {
         }
         is.close();
         return builder.toString();
+    }
+
+    public static String formatExportFilename(String prefix, String libraryName) {
+        DateTimeFormatter fmt = DateTimeFormat.forPattern("yyyy-MM-dd");
+        final String todayShort = fmt.print(new LocalDate());
+        final String filename = String.format("%s_%s_%s.json",
+            prefix, libraryName, todayShort);
+        // final String filename = prefix + "_" + libraryName + "_" + todayShort + ".json";
+        return filename;
     }
 }
