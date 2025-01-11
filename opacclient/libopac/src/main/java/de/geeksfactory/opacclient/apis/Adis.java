@@ -737,6 +737,14 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
         parse_search_wrapped(htmlPost(opac_url + ";jsessionid=" + s_sid, nvpairs), 1);
     }
 
+    /**
+     * Parsed Detail-Seite eines Suchergebnisses
+     * @param id
+     * @param doc
+     * @return
+     * @throws IOException
+     * @throws OpacErrorException
+     */
     DetailedItem parseResult(String id, Document doc)
             throws IOException, OpacErrorException {
         List<NameValuePair> nvpairs;
@@ -766,6 +774,7 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
             }
 
             if (desc.contains("Titel") && res.getTitle() == null) {
+                // Hier fast gleich wie in Konto/Ausleihen (nur ohne Präfix wie z.B. [DVD-Video]
                 res.setTitle(value.split("[:/;]")[0].trim());
 
                 if( (res.getMediaType() == MediaType.DVD) && (res.getAuthor() == null)) {
@@ -885,7 +894,7 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
         return value;
     }
 
-    private String stripRegie(String value) {
+    private static String stripRegie(String value) {
         Pattern pattern = Pattern.compile("Regie:[^.]*");
         Matcher matcher = pattern.matcher(value);
         if (matcher.find()) {
@@ -1843,7 +1852,7 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
     }
 
     /**
-     * Sets Title, Autor and MediaType in Item
+     * Sets Title, Autor and MediaType in AccountItem
      *
      * @param text               Textzeile mit Titel, Author etc und Id
      * @param seps               separetors
@@ -1896,11 +1905,16 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
         // title = title.trim();
         setTitleAndType(item, mediaType, title);
 
-        // Autor
+        // Author
         int indexAutor = indexTitle+1;
         if (indexAutor < split.length) {
-            item.setAuthor(
-                    split[indexAutor].replaceFirst("([^:;\n]+)[:;\n](.*)$", "$1").trim());
+            String author = split[indexAutor];
+            if (mediaType == MediaType.DVD) {
+                author =  stripRegie(split[indexAutor]);
+            } else {
+                author = author.replaceFirst("([^:;\n]+)[:;\n](.*)$", "$1").trim();
+            }
+            item.setAuthor(author);
         }
 
         // id is always the last one...
