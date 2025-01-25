@@ -50,6 +50,7 @@ import de.geeksfactory.opacclient.objects.Account;
 import de.geeksfactory.opacclient.objects.AccountData;
 import de.geeksfactory.opacclient.objects.Library;
 import de.geeksfactory.opacclient.storage.AccountDataSource;
+import de.geeksfactory.opacclient.storage.HistoryDataSource;
 import de.geeksfactory.opacclient.storage.JsonSearchFieldDataSource;
 import de.geeksfactory.opacclient.storage.PreferenceDataSource;
 import de.geeksfactory.opacclient.webservice.LibraryConfigUpdateService;
@@ -238,11 +239,17 @@ public class SyncAccountJob extends Worker {
             try {
                 data.update(account);
                 data.storeCachedAccountData(account, res);
+
+                // Update Lent-History
+                if (sp.getBoolean("history_maintain", false)) {
+                    HistoryDataSource historyDataSource = new HistoryDataSource(getApplicationContext(), app);
+                    historyDataSource.updateLending(account, res);
+                }
+
             } finally {
                 helper.generateAlarms();
             }
         }
         return failed;
     }
-
 }

@@ -142,11 +142,12 @@ public class MeaningDetectorImpl implements MeaningDetector {
         } else if (field instanceof TextSearchField
                 && (meaning == Meaning.BARCODE || meaning == Meaning.ISBN)) {
             field = new BarcodeSearchField(field.getId(),
-                    field.getDisplayName(), field.isAdvanced(),
+                    field.getDisplayName(), true,
                     ((TextSearchField) field).isHalfWidth(),
                     ((TextSearchField) field).getHint());
         } else if (meaning == Meaning.AUDIENCE || meaning == Meaning.SYSTEM
-                || meaning == Meaning.KEYWORD || meaning == Meaning.PUBLISHER) {
+                || meaning == Meaning.KEYWORD || meaning == Meaning.PUBLISHER
+                || meaning == Meaning.AVAILABLE || meaning == Meaning.ISBN ) {
             field.setAdvanced(true);
         }
         field.setData(oldfield.getData());

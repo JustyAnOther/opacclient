@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <style type="text/css">
+		@import url(css/aDISStandard.css);
+	</style>
+    <script src="js/aDISMain.min.js" type="text/javascript"></script>
+    <script src="js/fckeditor/fckeditor.js" type="text/javascript"></script>
+    <title> Stadtbibliothek Stuttgart </title>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width,initial-scale=1.0,shrink-to-fit=no">
+    <title>Stadtbibliothek Stuttgart</title>
+    <!--
+    (c) Software: aDIS/BMS und aDIS/Archiv von aStec angewandte Systemtechnik - www.astec.de
+    HTML/CSS: Formulare, Tabellen, Inhalte, etc. werden automatisiert durch aDIS/BMS generiert
+    Anpassungen Barrierefreiheit im aDIS-Rahmen: Nina Gerling
+    Projekt: aDIS-85 Stuttgart, OPAC01, de
+    Letztes Update: 21.11.2018 - 12:10
+    //-->
+    <script src="/aDISWeb_kopac85/js/scripts-head.js"></script>
+    <link rel="stylesheet" href="/aDISWeb_kopac85/css/kopac_style.css">
+    <link rel="stylesheet" href="/aDISWeb_stu/css/kopac_diff.css">
+    <!--[if lte IE 8]><link rel="stylesheet" href="/aDISWeb_kopac85/css/kopac_ie-old.css"><![endif]-->
+    <!--[if lt IE 9]><script src="/aDISWeb_kopac85/js/html5shiv-printshiv.min.js"></script><script src="/aDISWeb_kopac85/js/css3-mediaqueries.js"></script><![endif]-->
+    <link rel="shortcut icon" type="image/x-icon" href="/aDISWeb_stu/images/favicon.ico">
+</head>
+
+<body class="opac01">
+<script type="text/javascript"><!--
+
+
+
+
+
+function sendRequest() {
+  location.href="/aDISWeb/app;jsessionid=62312498761EA433ACFA0EFE52C4F915?service=direct/1/POOLM02Q@@@@@@@@_4B033800_36969C00/$BrowserBack";
+  }
+
+
+
+
+
+
+function startIdleTimer() {
+  if (typeof idleId != 'undefined')
+    clearTimeout(idleId)
+  idleId = window.setTimeout("to('"+ idleLink + "')", idleTime);
+}
+function to(link) {
+  location.href=link;
+}
+
+
+
+
+
+function setupHandlers()  {
+  document.onmousedown = docOnEvent;
+  document.onkeydown = docOnEvent;
+  document.onkeypress = docOnEvent;
+  document.onhelp = cancelF1;
+
+  initFormElements();
+  initIframes();
+  initScrollPos();
+}
+function getDimensions()  {
+  document.forms[0].scrDim.value = screen.width + ";" + screen.height;
+  if (window.innerWidth)
+    document.forms[0].winDim.value = window.innerWidth + ";" + window.innerHeight;
+  else
+    document.forms[0].winDim.value = document.body.offsetWidth + ";" + document.body.offsetHeight;
+  node = document.getElementById("img_content");
+  if (node != undefined)
+    document.forms[0].imgDim.value = node.offsetWidth + ";" + node.offsetHeight;
+}
+
+
+
+
+aDIS.onLoad = function (e)
+{
+
+
+if (history.pushState && history.state == null) {
+  history.pushState({ action : 1 }, "", null);
+  history.pushState({ action : 2 }, "", null);
+  }
+
+window.onpopstate = function (e) {
+  if(e.state != null && e.state.action)
+      sendRequest();
+  }
+
+
+
+  idleTime=600000;
+  idleLink="/aDISWeb/app;jsessionid=62312498761EA433ACFA0EFE52C4F915?service=direct/1/POOLM02Q@@@@@@@@_4B033800_36969C00/$Timeout";
+  startIdleTimer();
+
+
+  if (!e) var e = window.event;
+  document.forms[0].scriptEnabled.value=true;
+  if (self.specialOnLoad != undefined)
+    specialOnLoad(e);
+  setupHandlers();
+  getDimensions();
+
+}
+
+aDIS.addListener('load', window, aDIS.onLoad);
+
+
+// --></script>
+
+
+<div class="aDISMaske">
+    <form method="post" name="Form0" action="/aDISWeb/app;jsessionid=62312498761EA433ACFA0EFE52C4F915" onsubmit="return formOnSubmit();">
+        <input type="hidden" name="service" value="direct/1/POOLM02Q@@@@@@@@_4B033800_36969C00/$Form.form"/>
+        <input type="hidden" name="sp" value="S0"/>
+        <input type="hidden" name="Form0" value="focus,keyCode,stz,source,selected,requestCount,scriptEnabled,scrollPos,scrDim,winDim,imgDim,$FormConditional,textButton,$FormConditional$0,$FormConditional$1,textButton$0,$FormConditional$2,textButton$1,$FormConditional$3,$FormConditional$4,$FormConditional$5,$FormConditional$6,textButton$2,cellCheck,cellCheck$0,cellCheck$1,cellCheck$2,cellCheck$3,cellCheck$4,cellCheck$5,cellCheck$6,cellCheck$7,cellCheck$8,cellCheck$9,$FormConditional$7,$FormConditional$8,textButton$3,$FormConditional$9,textButton$4,$FormConditional$10,$FormConditional$11,$FormConditional$12,$FormConditional$13,textButton$5"/>
+        <input type="hidden" name="focus" value=""/>
+        <input type="hidden" name="keyCode" value="0"/>
+        <input type="hidden" name="stz" value=""/>
+        <input type="hidden" name="source" value=""/>
+        <input type="hidden" name="selected" value=""/>
+        <input type="hidden" name="requestCount" value="4"/>
+        <input type="hidden" name="scriptEnabled" value="T"/>
+        <input type="hidden" name="scrollPos" value="0"/>
+        <input type="hidden" name="scrDim" value=""/>
+        <input type="hidden" name="winDim" value=""/>
+        <input type="hidden" name="imgDim" value=""/>
+        <input type="hidden" name="$FormConditional" value="T"/>
+        <input type="hidden" name="$FormConditional$0" value="F"/>
+        <input type="hidden" name="$FormConditional$1" value="T"/>
+        <input type="hidden" name="$FormConditional$2" value="T"/>
+        <input type="hidden" name="$FormConditional$3" value="F"/>
+        <input type="hidden" name="$FormConditional$4" value="F"/>
+        <input type="hidden" name="$FormConditional$5" value="F"/>
+        <input type="hidden" name="$FormConditional$6" value="T"/>
+        <input type="hidden" name="$FormConditional$7" value="F"/>
+        <input type="hidden" name="$FormConditional$8" value="T"/>
+        <input type="hidden" name="$FormConditional$9" value="T"/>
+        <input type="hidden" name="$FormConditional$10" value="F"/>
+        <input type="hidden" name="$FormConditional$11" value="F"/>
+        <input type="hidden" name="$FormConditional$12" value="F"/>
+        <input type="hidden" name="$FormConditional$13" value="T"/>
+
+
+
+
+
+
+
+
+
+
+
+        <div id="wrapper">
+            <div id="wrapper_inside">
+                <nav id="sprunglinks" aria-label="Sprunglinks">
+                    <ul>
+                        <li><a class="sprung" href="#main">Zum Inhalt</a></li>
+                    </ul>
+                </nav>
+                <header id="header">
+                    <div class="inside">
+                        <div id="mhead" class="block">
+                            <div id="mhead-inside">
+                                <div id="logo" role="banner"><a href="http://www1.stuttgart.de/stadtbibliothek/" title="Zur Homepage der Bibliothek"><img src="/aDISWeb_stu/images/logo.png" alt="Stuttgart-Logo"></a></div>
+                                <nav class="mod_navigation block" id="mnav" aria-label="Servicemen&uuml;">
+                                    <div class="tree_div">
+                                        <ul class="tree_ul">
+                                            <li class="tree_leaf_li_sel">
+                                                <strong><span class="tree_strong">Anmelden</span></strong></li>
+                                            <li class="tree_leaf_li">
+                                                <a href="/aDISWeb/app;jsessionid=62312498761EA433ACFA0EFE52C4F915?service=direct/1/POOLM02Q@@@@@@@@_4B033800_36969C00/$Tree.treeNodes&amp;sp=SL2&amp;requestCount=4" class="tree_leaf_a">Abmelden</a></li>
+                                        </ul></div>
+
+                                </nav>
+                                <nav id="fontsizer" aria-label="Schriftgr&ouml;&szlig;e">
+                                    <ul>
+                                        <li><a href="#" id="small" data-set-font-size="small"><span class="schrift">Schrift</span> <span class="schriftgroesse">klein</span></a></li>
+                                        <li><a href="#" id="normal" data-set-font-size="medium" class="selected"><span class="schrift">Schrift</span> <span class="schriftgroesse">normal</span></a></li>
+                                        <li><a href="#" id="big" data-set-font-size="large"><span class="schrift">Schrift</span> <span class="schriftgroesse">gro&szlig;</span></a></li>
+                                    </ul>
+                                </nav>
+                            </div>
+                        </div>
+                        <nav id="hnav" class="mod_navigation block" aria-label="Hauptnavigation">
+                            <input id="main-menu-state" type="checkbox">
+                            <label class="main-menu-btn" for="main-menu-state"><span class="main-menu-btn-icon"></span> Navigation aktivieren / deaktivieren</label>
+
+                            <!-- Menu -->
+                            <ul class="cssmenu_ul sm sm-style" id="main-menu">
+                                <li class="cssmenu_button">
+                                    <a href="/aDISWeb/app;jsessionid=62312498761EA433ACFA0EFE52C4F915?service=direct/1/POOLM02Q@@@@@@@@_4B033800_36969C00/$InternalLink.directlink&amp;sp=S%24%24GFBO_41&amp;sp=SS1&amp;requestCount=4" title="" fld="$$GFBO_41">Startseite</a>
+                                </li>
+                                <li class="cssmenu_button">
+                                    <a href="/aDISWeb/app;jsessionid=62312498761EA433ACFA0EFE52C4F915?service=direct/1/POOLM02Q@@@@@@@@_4B033800_36969C00/$InternalLink$0.directlink&amp;sp=S%24%24GFBO_42&amp;sp=SBK&amp;requestCount=4" title="" fld="$$GFBO_42">Mein Konto</a>
+                                </li>
+                                <li class="cssmenu_button">
+                                    <a href="/aDISWeb/app;jsessionid=62312498761EA433ACFA0EFE52C4F915?service=direct/1/POOLM02Q@@@@@@@@_4B033800_36969C00/$InternalLink$1.directlink&amp;sp=S%24%24GFBO_43&amp;sp=SAP&amp;requestCount=4" title="" fld="$$GFBO_43">Meine Suchen</a>
+                                </li>
+                                <li class="cssmenu_ul"><a href="#">Medienlisten</a>
+                                    <ul class="menufts">
+                                        <li class="cssmenu_button">
+                                            <a href="/aDISWeb/app;jsessionid=62312498761EA433ACFA0EFE52C4F915?service=direct/1/POOLM02Q@@@@@@@@_4B033800_36969C00/$InternalLink$2.directlink&amp;sp=S%24%24GFBO_44&amp;sp=SW1&amp;requestCount=4" title="" fld="$$GFBO_44">Neuerwerbungen</a>
+                                        </li>
+                                        <li class="cssmenu_button">
+                                            <a href="/aDISWeb/app;jsessionid=62312498761EA433ACFA0EFE52C4F915?service=direct/1/POOLM02Q@@@@@@@@_4B033800_36969C00/$InternalLink$3.directlink&amp;sp=S%24%24GFBO_45&amp;sp=SW4&amp;requestCount=4" title="" fld="$$GFBO_45">Empfehlungen</a>
+                                        </li>
+                                    </ul></li>
+                                <li class="cssmenu_button">
+                                    <a href="/aDISWeb/app;jsessionid=62312498761EA433ACFA0EFE52C4F915?service=direct/1/POOLM02Q@@@@@@@@_4B033800_36969C00/$InternalLink$4.directlink&amp;sp=S%24%24GFBO_46&amp;sp=SW2&amp;requestCount=4" title="" fld="$$GFBO_46">Digitale Angebote</a>
+                                </li>
+                                <li class="cssmenu_button">
+                                    <a href="/aDISWeb/app;jsessionid=62312498761EA433ACFA0EFE52C4F915?service=direct/1/POOLM02Q@@@@@@@@_4B033800_36969C00/$InternalLink$5.directlink&amp;sp=S%24%24GFBO_47&amp;sp=SW6&amp;requestCount=4" title="" fld="$$GFBO_47">Kontakt</a>
+                                </li>
+                                <li class="cssmenu_button">
+                                    <a href="/aDISWeb/app;jsessionid=62312498761EA433ACFA0EFE52C4F915?service=direct/1/POOLM02Q@@@@@@@@_4B033800_36969C00/$InternalLink$6.directlink&amp;sp=S%24%24GFBO_48&amp;sp=SW9&amp;requestCount=4" title="" fld="$$GFBO_48">Hilfe</a>
+                                </li>
+                            </ul>
+                        </nav>
+                    </div>
+                </header>
+                <div id="container">
+                    <div id="container-inside">
+                        <main id="main" aria-label="Hauptbereich">
+                            <div class="inside">
+
+                                <!-- GRID SYSTEM START -->
+                                <div class="grid-wrapper">
+                                    <div class="grid-row">
+
+                                        <!-- START: KOPFBEREICH -->
+                                        <div class="grid-col col-12 col-sm-12 col-md-8 col-lg-8 col-xl-9">
+                                            <div class="grid-inside">
+                                                <h1><span class="invisible">Aktuelle Seite: </span>
+
+                                                    <span class="txtinsert">
+Mein Konto / Ausleihen
+</span>
+                                                </h1>
+                                            </div>
+                                        </div>
+
+                                        <!-- START Druckbutton -->
+                                        <div class="grid-col col-12 col-sm-12 col-md-4 col-lg-4 col-xl-3">
+                                            <div class="grid-inside">
+                                                <div class="wissen">
+                                                    <p id="druckversion">
+
+
+                                                        <input type="submit" name="textButton" value="Druckversion" fld="$$GFBO_88"/>
+
+
+
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- ENDE: OPTIONEN-Spalte RECHTS -->
+                                        <div class="grid-col col-12 col-sm-12 col-md-12 col-lg-12 col-xl-12">
+                                            <div class="grid-inside">
+                                                <div id="OPACLI" style="   width:99%;" class="aDISListe"><div class="html_div" style="width:99%; height:100%;">Ihre ausgeliehenen Titel: Bitte beachten Sie das Fälligkeitsdatum. Bei verspäteter Rückgabe entstehen Ihnen Kosten!<br>Nutzen Sie rechtzeitig das Verlängerungsangebot. <b>Zur Verlängerung gebührenpflichtiger Medien markieren Sie diese bitte einzeln und klicken dann auf "Markierte Titel verlängern".</b><p>Konto - Ausleihen für Herrn Beyer, Michael - Abholcode: Mi7259</p></div></div>
+                                                <div id="R04">
+                                                    <p class="block">
+
+
+
+
+                                                        <input type="submit" name="textButton$0" value="Alle verl&#228;ngern" class="verlaengern" fld="$$GFBO_3"/>
+
+
+
+
+
+
+                                                        <input type="submit" name="textButton$1" value="Markierte Medien verl&#228;ngern" class="verlaengern" fld="$$GFBO_4"/>
+
+
+
+
+
+
+
+
+
+
+
+
+                                                        <input type="submit" name="textButton$2" value="Abbrechen" class="abbrechen" fld="$$GFBO_11"/>
+
+
+
+                                                    </p>
+                                                </div>
+                                                <div id="R05">
+                                                    <div style="   width:99%; ">	<div class="rTable_div">
+                                                        <table colDisable="[true, true, true, true, true]" width="100%" colCase="[, , , , ]" class="rTable_table">
+                                                            <colgroup>
+                                                                <col width="04%"></col><col width="11%"></col><col width="22%"></col><col width="34%"></col><col width="29%"></col>	</colgroup>
+                                                            <thead class="rTable_thead">
+                                                            <tr>
+                                                                <th scope="col" class="rTable_th"></th><th scope="col" class="rTable_th">Fällig am</th><th scope="col" class="rTable_th">UEBER3</th><th scope="col" class="rTable_th">Titel</th><th scope="col" class="rTable_th">Hinweis</th>	</tr>
+                                                            </thead>
+                                                            <tbody>
+
+                                                            <tr class="rTable_tr_even">
+
+                                                                <td class="">
+                                                                    <input type="checkbox" name="cellCheck" fld="###CHK_1" id="cellCheck"/><label for="cellCheck"><span class="invisible">Markieren</span></label>
+                                                                </td>
+
+                                                                <td class="">
+                                                                    18.12.2019
+                                                                </td>
+
+                                                                <td class="">
+                                                                    Stadtbibliothek am Mailänder Platz
+                                                                </td>
+
+                                                                <td class="">
+                                                                    ¬Die¬ Kultur der Freiheit : der Westen gerät in Gefahr, weil eine falsche Idee der Freiheit die Alltagsvernunft zerstört. / Udo Di Fabio<br/>Gcm Di<br/>14944197
+                                                                </td>
+
+                                                                <td class="">
+                                                                    verlängerbar - Stand 09.12.2019<br/>1 Verlängerung
+                                                                </td>
+
+                                                            </tr>
+
+                                                            <tr class="rTable_tr_odd">
+
+                                                                <td class="rTable_td_check">
+                                                                    <input type="checkbox" name="cellCheck$0" fld="###CHK_2" id="cellCheck_0"/><label for="cellCheck_0"><span class="invisible">Markieren</span></label>
+                                                                </td>
+
+                                                                <td class="rTable_td_text">
+                                                                    18.12.2019
+                                                                </td>
+
+                                                                <td class="rTable_td_text">
+                                                                    Stadtbibliothek am Mailänder Platz
+                                                                </td>
+
+                                                                <td class="rTable_td_text">
+                                                                    Einführung in die Kryptographie / Johannes Buchmann<br/>Te Buch<br/>15848267
+                                                                </td>
+
+                                                                <td class="rTable_td_text">
+                                                                    verlängerbar - Stand 09.12.2019<br/>1 Verlängerung
+                                                                </td>
+
+                                                            </tr>
+
+                                                            <tr class="rTable_tr_even">
+
+                                                                <td class="rTable_td_check">
+                                                                    <input type="checkbox" name="cellCheck$1" fld="###CHK_3" id="cellCheck_1"/><label for="cellCheck_1"><span class="invisible">Markieren</span></label>
+                                                                </td>
+
+                                                                <td class="rTable_td_text">
+                                                                    18.12.2019
+                                                                </td>
+
+                                                                <td class="rTable_td_text">
+                                                                    Stadtbibliothek am Mailänder Platz
+                                                                </td>
+
+                                                                <td class="rTable_td_text">
+                                                                    [DVD-Video] Carmen [DVD] / Regie: Carlos Saura. Drehb.: Antonio Gades ... Musik: Paco de Lucía ... Darst.: Antonio Gades ; Laura del Sol ; Paco de Lucía ...<br/>Carm<br/>15916697
+                                                                </td>
+
+                                                                <td class="rTable_td_text">
+                                                                    verlängerbar - Stand 09.12.2019<br/>1 Verlängerung
+                                                                </td>
+
+                                                            </tr>
+
+                                                            <tr class="rTable_tr_odd">
+
+                                                                <td class="rTable_td_check">
+                                                                    <input type="checkbox" name="cellCheck$2" fld="###CHK_4" id="cellCheck_2"/><label for="cellCheck_2"><span class="invisible">Markieren</span></label>
+                                                                </td>
+
+                                                                <td class="rTable_td_text">
+                                                                    23.12.2019
+                                                                </td>
+
+                                                                <td class="rTable_td_text">
+                                                                    Vaihingen
+                                                                </td>
+
+                                                                <td class="rTable_td_text">
+                                                                    [DVD-Video] ¬Der¬ rosarote Panther [DVD] / Regie: Blake Edwards. Drehb.: Maurice Richlin ... Musik: Henry Mancini. Darst.: David Niven ; Peter Sellers ; Robert Wagner ...<br/>Rosa<br/>14934008
+                                                                </td>
+
+                                                                <td class="rTable_td_text">
+                                                                    verlängerbar - Stand 09.12.2019<br/>1 Verlängerung
+                                                                </td>
+
+                                                            </tr>
+
+                                                            <tr class="rTable_tr_even">
+
+                                                                <td class="rTable_td_check">
+                                                                    <input type="checkbox" name="cellCheck$3" fld="###CHK_5" id="cellCheck_3"/><label for="cellCheck_3"><span class="invisible">Markieren</span></label>
+                                                                </td>
+
+                                                                <td class="rTable_td_text">
+                                                                    02.01.2020
+                                                                </td>
+
+                                                                <td class="rTable_td_text">
+                                                                    Stadtbibliothek am Mailänder Platz
+                                                                </td>
+
+                                                                <td class="rTable_td_text">
+                                                                    Android mit Kotlin – kurz & gut / Jörg Staudemeyer<br/>Wcm 2 Android-SDK<br/>15952563
+                                                                </td>
+
+                                                                <td class="rTable_td_text">
+                                                                    verlängerbar - Stand 09.12.2019<br/>1 Verlängerung
+                                                                </td>
+
+                                                            </tr>
+
+                                                            <tr class="rTable_tr_odd">
+
+                                                                <td class="rTable_td_check">
+                                                                    <input type="checkbox" name="cellCheck$4" fld="###CHK_6" id="cellCheck_4"/><label for="cellCheck_4"><span class="invisible">Markieren</span></label>
+                                                                </td>
+
+                                                                <td class="rTable_td_text">
+                                                                    02.01.2020
+                                                                </td>
+
+                                                                <td class="rTable_td_text">
+                                                                    Stadtbibliothek am Mailänder Platz
+                                                                </td>
+
+                                                                <td class="rTable_td_text">
+                                                                    [DVD-Video] Jesus Christ Superstar [DVD] : das legendäre Musical!<br/>TD4 Jes<br/>14802353
+                                                                </td>
+
+                                                                <td class="rTable_td_text">
+                                                                    verlängerbar - Stand 09.12.2019
+                                                                </td>
+
+                                                            </tr>
+
+                                                            <tr class="rTable_tr_even">
+
+                                                                <td class="rTable_td_check">
+                                                                    <input type="checkbox" name="cellCheck$5" fld="###CHK_7" id="cellCheck_5"/><label for="cellCheck_5"><span class="invisible">Markieren</span></label>
+                                                                </td>
+
+                                                                <td class="rTable_td_text">
+                                                                    02.01.2020
+                                                                </td>
+
+                                                                <td class="rTable_td_text">
+                                                                    Vaihingen
+                                                                </td>
+
+                                                                <td class="rTable_td_text">
+                                                                    Leben 3.0 : Mensch sein im Zeitalter Künstlicher Intelligenz / Max Tegmark ; aus dem Amerikanischen von Hubert Mania<br/>Wcb 1 Teg<br/>16206895
+                                                                </td>
+
+                                                                <td class="rTable_td_text">
+                                                                    verlängerbar - Stand 09.12.2019<br/>5 Verlängerungen
+                                                                </td>
+
+                                                            </tr>
+
+                                                            <tr class="rTable_tr_odd">
+
+                                                                <td class="rTable_td_check">
+                                                                    <input type="checkbox" name="cellCheck$6" fld="###CHK_8" id="cellCheck_6"/><label for="cellCheck_6"><span class="invisible">Markieren</span></label>
+                                                                </td>
+
+                                                                <td class="rTable_td_text">
+                                                                    03.01.2020
+                                                                </td>
+
+                                                                <td class="rTable_td_text">
+                                                                    Vaihingen
+                                                                </td>
+
+                                                                <td class="rTable_td_text">
+                                                                    [CD] Ziggy Stardust and the spiders from Mars [CD] : the motion picture soundtrack ; 30th anniversary 2 CD set / David Bowie<br/>TR Pop/Rock B<br/>15831741
+                                                                </td>
+
+                                                                <td class="rTable_td_text">
+                                                                    verlängerbar - Stand 09.12.2019
+                                                                </td>
+
+                                                            </tr>
+
+                                                            <tr class="rTable_tr_even">
+
+                                                                <td class="rTable_td_check">
+                                                                    <input type="checkbox" name="cellCheck$7" fld="###CHK_9" id="cellCheck_7"/><label for="cellCheck_7"><span class="invisible">Markieren</span></label>
+                                                                </td>
+
+                                                                <td class="rTable_td_text">
+                                                                    03.01.2020
+                                                                </td>
+
+                                                                <td class="rTable_td_text">
+                                                                    Vaihingen
+                                                                </td>
+
+                                                                <td class="rTable_td_text">
+                                                                    [Die vollständige] Maus : die Geschichte eines Überlebenden / Art Spiegelman. Dt. von Christine Brinck und Josef Joffe<br/>R Spi<br/>16064608
+                                                                </td>
+
+                                                                <td class="rTable_td_text">
+                                                                    verlängerbar - Stand 09.12.2019
+                                                                </td>
+
+                                                            </tr>
+
+                                                            <tr class="rTable_tr_odd">
+
+                                                                <td class="rTable_td_check">
+                                                                    <input type="checkbox" name="cellCheck$8" fld="###CHK_10" id="cellCheck_8"/><label for="cellCheck_8"><span class="invisible">Markieren</span></label>
+                                                                </td>
+
+                                                                <td class="rTable_td_text">
+                                                                    03.01.2020
+                                                                </td>
+
+                                                                <td class="rTable_td_text">
+                                                                    Vaihingen
+                                                                </td>
+
+                                                                <td class="rTable_td_text">
+                                                                    [DVD-Video] Lost in Translation [DVD] / Regie und Drehb.: Sofia Coppola. Musik: William Storkson. Darst.: Bill Murray ; Scarlett Johansson ; Giovanni Ribisi ...<br/>Lost<br/>14909925
+                                                                </td>
+
+                                                                <td class="rTable_td_text">
+                                                                    verlängerbar - Stand 09.12.2019
+                                                                </td>
+
+                                                            </tr>
+
+                                                            <tr class="rTable_tr_even">
+
+                                                                <td class="rTable_td_check">
+                                                                    <input type="checkbox" name="cellCheck$9" fld="###CHK_11" id="cellCheck_9"/><label for="cellCheck_9"><span class="invisible">Markieren</span></label>
+                                                                </td>
+
+                                                                <td class="rTable_td_text">
+                                                                    03.01.2020
+                                                                </td>
+
+                                                                <td class="rTable_td_text">
+                                                                    Vaihingen
+                                                                </td>
+
+                                                                <td class="rTable_td_text">
+                                                                    [DVD-Video] Life of Pi - Schiffbruch mit Tiger [DVD] / Regie: Ang Lee. Drehb.: David Magee. Musik: Mychael Danna. Darst.: Suraj Sharma ; Irrfan Khan ; Tabu ...<br/>Life<br/>15660994
+                                                                </td>
+
+                                                                <td class="rTable_td_text">
+                                                                    verlängerbar - Stand 09.12.2019
+                                                                </td>
+
+                                                            </tr>
+                                                            </tbody>
+                                                        </table>	</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+                                                    </div>
+
+
+                                                    <object width="0" id="$Plugin" type="application/x-aStec-aDISPrint" data="/aDISWeb/app;jsessionid=62312498761EA433ACFA0EFE52C4F915?service=aDISPrint/POOLM02Q@@@@@@@@_4B033800_36969C00/$Plugin" height="0"></object>
+                                                </div>
+                                                <div id="R06">
+                                                    <p class="block">
+
+
+
+                                                        <input type="submit" name="textButton$3" value="Alle verl&#228;ngern" class="verlaengern" fld="$$GFBO_13"/>
+
+
+
+
+
+                                                        <input type="submit" name="textButton$4" value="Markierte Medien verl&#228;ngern" class="verlaengern" fld="$$GFBO_14"/>
+
+
+
+
+
+
+
+
+                                                        <input type="submit" name="textButton$5" value="Abbrechen" class="abbrechen" fld="$$GFBO_21"/>
+
+
+
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- GRID SYSTEM STOP -->
+                            </div>
+                        </main>
+                    </div>
+                </div>
+                <footer id="footer">
+                    <div class="inside">
+                        <div class="grid-wrapper">
+                            <div class="grid-row">
+                                <div class="grid-col col-12 col-sm-12 col-lg-12 col-md-8 col-xl-8">
+                                    <nav id="legal" class="mod_navigation block" aria-label="Rechtliche Links">
+                                        <ul>
+                                            <li><a href="http://www.stuttgart.de/stadtbibliothek/bvs/actions/profile/view.php?id=67" target="_blank">Impressum</a></li>
+                                            <li><a href="http://www.stuttgart.de/item/show/339312/1" target="_blank">Datenschutz</a></li>
+                                            <li><a href="http://www1.stuttgart.de/stadtbibliothek/bvs/actions/profile/view.php?id=172" target="_blank">Benutzungs- und Geb&uuml;hrenordnung</a></li>
+                                            <li><a href="mailto:ebibliothek@stuttgart.de">E-Mail eBibliothek Webmaster</a></li>
+                                        </ul>
+                                    </nav>
+                                </div>
+                                <div class="grid-col col-12 col-sm-12 col-md-4 col-lg-4 col-xl-4">
+                                    <p class="block" id="goingup">
+                                        <a href="#wrapper">Seitenanfang</a>
+                                    </p>
+                                </div>
+                                <div class="grid-col col-12 col-sm-12 col-md-12 col-lg-12 col-xl-12">
+                                    <p id="credits">
+                                        <a href="http://www.astec.de" target="_blank">Barrierefreie Bibliothekssoftware der aStec angewandte Systemtechnik</a>
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="clear"></div>
+                    </div>
+                </footer>
+            </div>
+            <!-- /wrapper_inside -->
+        </div>
+        <!-- /wrapper -->
+        <script src="/aDISWeb_kopac85/js/scripts-main.js"></script>
+        <script type='text/javascript' src='/aDISWeb_stu/js/piwik.js'></script>
+        <noscript><p><img src="//matomo.stuttgart.de/piwik.php?idsite=77&rec=1" style="border:0;" alt="" /></p></noscript>
+
+    </form>
+</div>
+</body>
+</html>

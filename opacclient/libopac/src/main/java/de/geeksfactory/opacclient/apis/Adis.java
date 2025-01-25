@@ -15,7 +15,6 @@ import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -24,6 +23,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -33,6 +34,7 @@ import de.geeksfactory.opacclient.networking.HttpClientFactory;
 import de.geeksfactory.opacclient.networking.NotReachableException;
 import de.geeksfactory.opacclient.objects.Account;
 import de.geeksfactory.opacclient.objects.AccountData;
+import de.geeksfactory.opacclient.objects.AccountItem;
 import de.geeksfactory.opacclient.objects.Copy;
 import de.geeksfactory.opacclient.objects.Detail;
 import de.geeksfactory.opacclient.objects.DetailedItem;
@@ -52,6 +54,8 @@ import okhttp3.FormBody;
 
 public class Adis extends OkHttpBaseApi implements OpacApi {
 
+    private static final Logger LOGGER = Logger.getLogger(Adis.class.getName());
+
     protected static final String DATA_DISABLE_WHEN_SELECTED = "disableWhenSelected";
     protected static final String DATA_GROUP = "group";
     protected static HashMap<String, MediaType> types = new HashMap<>();
@@ -68,6 +72,8 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
         types.put("Konsolenspiel", MediaType.GAME_CONSOLE);
         types.put("Spielkonsole", MediaType.GAME_CONSOLE);
         types.put("CD", MediaType.CD);
+        types.put("MP3-CD", MediaType.CD);
+        types.put("MP3", MediaType.CD);
         types.put("Zeitschrift", MediaType.MAGAZINE);
         types.put("Zeitschriftenheft", MediaType.MAGAZINE);
         types.put("Zeitung", MediaType.NEWSPAPER);
@@ -79,6 +85,7 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
         types.put("Munzinger", MediaType.EBOOK);
         types.put("E-Audio", MediaType.EAUDIO);
         types.put("Blu-Ray", MediaType.BLURAY);
+        types.put("Blu-ray Disc", MediaType.BLURAY);
     }
 
     protected String opac_url = "";
@@ -129,6 +136,9 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
 
     public Document htmlGet(String url) throws
             IOException {
+        final String methodName = "htmlGet ";
+
+        logInfo("%s %s - %s", methodName, s_requestCount, url);
 
         if (!url.contains("requestCount") && s_requestCount >= 0) {
             url = url + (url.contains("?") ? "&" : "?") + "requestCount="
@@ -136,20 +146,14 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
         }
 
         String html = httpGet(url, getDefaultEncoding());
-        Document doc = Jsoup.parse(html);
-        Pattern patRequestCount = Pattern.compile("requestCount=([0-9]+)");
-        for (Element a : doc.select("a")) {
-            Matcher objid_matcher = patRequestCount.matcher(a.attr("href"));
-            if (objid_matcher.matches()) {
-                s_requestCount = Integer.parseInt(objid_matcher.group(1));
-            }
-        }
-        doc.setBaseUri(url);
-        return doc;
+
+        return parseHtml(methodName, url, html);
     }
 
     public Document htmlPost(String url, List<NameValuePair> data)
             throws IOException {
+        final String methodName = "htmlPost";
+
         boolean rcf = false;
         for (NameValuePair nv : data) {
             if (nv.getName().equals("requestCount")) {
@@ -157,8 +161,27 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
                 break;
             }
         }
+        logInfo("%s %s - %s", methodName, s_requestCount, url);
         if (!rcf) {
             data.add(new BasicNameValuePair("requestCount", s_requestCount + ""));
+        }
+
+        if (LOGGER.isLoggable(Level.INFO)) {
+            StringBuffer sb = new StringBuffer();
+            for (NameValuePair nv : data) {
+                if (nv.getName().startsWith("$Toolbar")) {
+                    sb.append(nv.getName());
+                    sb.append("=");
+                    sb.append(nv.getValue());
+                    sb.append(",");
+                }
+            }
+            if(sb.length()>0) {
+                sb.setLength(sb.length()-1);
+                logInfo("%s - %s", methodName, sb.toString());
+            } else {
+                logInfo("%s - %s", methodName, "no $Toolbar...");
+            }
         }
 
         FormBody.Builder builder = new FormBody.Builder();
@@ -167,17 +190,39 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
         }
 
         String html = httpPost(url, builder.build(), getDefaultEncoding());
+
+        return parseHtml(methodName, url, html);
+    }
+
+    private Document parseHtml(String methodName, String url, String html) {
         Document doc = Jsoup.parse(html);
+
+        if (LOGGER.isLoggable(Level.INFO)) {
+            Elements elements = doc.select("title");
+            String title = ( (elements.size() > 0) ? elements.first().text(): "-");
+            elements = doc.select("h1");
+            String h1 = ( (elements.size() > 0) ? elements.get(elements.size()-1).text(): "-");
+            logInfo("%s Result - title/h1: %s/%s", methodName, title, h1);
+        }
+
+        setRequestCount(doc);
+
+        doc.setBaseUri(url);
+
+        return doc;
+    }
+
+    private boolean setRequestCount(Document doc) {
         Pattern patRequestCount = Pattern
-                .compile(".*requestCount=([0-9]+)[^0-9].*");
+                .compile("requestCount=([0-9]+)");
         for (Element a : doc.select("a")) {
             Matcher objid_matcher = patRequestCount.matcher(a.attr("href"));
-            if (objid_matcher.matches()) {
+            if (objid_matcher.find()) {
                 s_requestCount = Integer.parseInt(objid_matcher.group(1));
+                return true;
             }
         }
-        doc.setBaseUri(url);
-        return doc;
+        return false;
     }
 
     private void _start() throws IOException, OpacErrorException {
@@ -224,6 +269,7 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
             if (!accountFormOldstyle) {
                 List<NameValuePair> nvpairs_a = new ArrayList(s_pageform);
                 nvpairs_a.add(new BasicNameValuePair("$ScriptButton_hidden", "BK"));
+                nvpairs_a.add(new BasicNameValuePair("selected", "ZTEXT       *SBK"));
                 accountFormBody = nvpairs_a;
             }
 
@@ -579,6 +625,7 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
         this.data = library.getData();
         try {
             this.opac_url = data.getString("baseurl");
+            logInfo("%s - this.opac_url = %s", "init", this.opac_url);
         } catch (JSONException e) {
             throw new RuntimeException(e);
         }
@@ -690,6 +737,14 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
         parse_search_wrapped(htmlPost(opac_url + ";jsessionid=" + s_sid, nvpairs), 1);
     }
 
+    /**
+     * Parsed Detail-Seite eines Suchergebnisses
+     * @param id
+     * @param doc
+     * @return
+     * @throws IOException
+     * @throws OpacErrorException
+     */
     DetailedItem parseResult(String id, Document doc)
             throws IOException, OpacErrorException {
         List<NameValuePair> nvpairs;
@@ -707,17 +762,41 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
             if (tr.children().size() < 2) {
                 continue;
             }
-            String title = tr.child(0).text().trim();
+            String desc = tr.child(0).text().trim();
             String value = tr.child(1).text().trim();
             if (value.contains("hier klicken") || value.startsWith("zur ") ||
-                    title.contains("URL")) {
-                res.addDetail(new Detail(title, tr.child(1).select("a").first().absUrl("href")));
+                    desc.contains("URL")) {
+                res.addDetail(new Detail(desc, tr.child(1).select("a").first().absUrl("href")));
+            } else if("Zitierlink".equals(value)) {
+                // nicht in Detail übernehmen, unnützt
             } else {
-                res.addDetail(new Detail(title, value));
+                res.addDetail(new Detail(desc, value));
             }
 
-            if (title.contains("Titel") && res.getTitle() == null) {
+            if (desc.contains("Titel") && res.getTitle() == null) {
+                // Hier fast gleich wie in Konto/Ausleihen (nur ohne Präfix wie z.B. [DVD-Video]
                 res.setTitle(value.split("[:/;]")[0].trim());
+
+                if( (res.getMediaType() == MediaType.DVD) && (res.getAuthor() == null)) {
+                    String regie = stripRegie(value);
+                    if (regie != null) {
+                        res.setAuthor(regie);
+                    }
+                }
+            }
+            if (desc.contains("Medienart") && res.getMediaType() == null) {
+                MediaType mediaType = checkType(value, true);
+                if (mediaType != null) {
+                    try {
+                        res.setMediaType(mediaType);
+                    } catch(IllegalArgumentException e) {
+                        LOGGER.log(Level.WARNING, e.getMessage());
+                    }
+                }
+            }
+
+            if (desc.contains("Verfasser") && res.getAuthor() == null) {
+                res.setAuthor(stripAuthor(value));
             }
         }
 
@@ -793,6 +872,35 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
             // an id,< we just can not use it.
         }
         return res;
+    }
+
+    private String stripAuthor(String value) {
+        Pattern pattern = Pattern
+                // falls Jahreszahlen am Ende stehen müssten, z. B.
+                // Clark, Christopher M., 1960-
+//              .compile("(.*)[0-9]{4,4}-([0-9]{4,4})*\\s*$");
+                // nach Jahreszahlen interessiert nicht., z.B.
+                // Händel, Georg Friedrich, 1685-1759 [Komponist/in]
+                .compile("(.*)[0-9]{4,4}-([0-9]{4,4}){0,1}.*");
+
+        Matcher nameMatcher = pattern.matcher(value);
+        if (nameMatcher.find()) {
+            String name = nameMatcher.group(1).trim();
+            if (name.endsWith(",")) {
+                return name.substring(0, name.length()-1);
+            }
+            return name;
+        }
+        return value;
+    }
+
+    private static String stripRegie(String value) {
+        Pattern pattern = Pattern.compile("Regie:[^.]*");
+        Matcher matcher = pattern.matcher(value);
+        if (matcher.find()) {
+            return matcher.group(0).trim();
+        }
+        return value;
     }
 
     @Override
@@ -1113,8 +1221,15 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
             }
             form.add(new BasicNameValuePair(button.attr("name"), button.attr("value")));
             doc = htmlPost(opac_url + ";jsessionid=" + s_sid, form);
-            max_steps--;
         }
+
+        // Reset
+        try {
+            reset(doc);
+        } catch (OpacErrorException e) {
+            e.printStackTrace();
+        }
+
         return doc;
     }
 
@@ -1135,7 +1250,6 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
     @Override
     public ProlongResult prolong(String media, Account account, int useraction,
             String selection) throws IOException {
-        String alink = null;
         Document doc;
 
         try {
@@ -1148,19 +1262,13 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
         } catch (OpacErrorException e) {
             return new ProlongResult(Status.ERROR, e.getMessage());
         }
-        for (Element tr : doc.select(".rTable_div tr")) {
-            if (tr.select("a").size() == 1) {
-                if (tr.select("a").first().absUrl("href")
-                      .contains("sp=SZA")) {
-                    alink = tr.select("a").first().absUrl("href");
-                }
-            }
-        }
-        if (alink == null) {
+        Ausleihen ausleihen = getAusleihen(doc);
+
+        if (ausleihen.alink == null) {
             return new ProlongResult(Status.ERROR);
         }
 
-        doc = htmlGet(alink);
+        doc = htmlGet(ausleihen.alink);
 
         List<NameValuePair> form = new ArrayList<>();
         for (Element input : doc.select("input, select")) {
@@ -1172,7 +1280,7 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
                         .attr("value")));
             }
         }
-        for (Element tr : doc.select(".rTable_div tr")) {
+        for (Element tr : getServiceElements(doc)) {
             if (tr.select("input").attr("name").equals(media.split("\\|")[0])) {
                 boolean disabled = tr.select("input").hasAttr("disabled");
                 try {
@@ -1219,7 +1327,6 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
     @Override
     public ProlongAllResult prolongAll(Account account, int useraction,
             String selection) throws IOException {
-        String alink = null;
         Document doc;
         try {
             _start();
@@ -1231,19 +1338,12 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
         } catch (OpacErrorException e) {
             return new ProlongAllResult(Status.ERROR, e.getMessage());
         }
-        for (Element tr : doc.select(".rTable_div tr")) {
-            if (tr.select("a").size() == 1) {
-                if (tr.select("a").first().absUrl("href")
-                      .contains("sp=SZA")) {
-                    alink = tr.select("a").first().absUrl("href");
-                }
-            }
-        }
-        if (alink == null) {
+        Ausleihen ausleihen = getAusleihen(doc);
+        if (ausleihen.alink == null) {
             return new ProlongAllResult(Status.ERROR);
         }
 
-        doc = htmlGet(alink);
+        doc = htmlGet(ausleihen.alink);
 
         List<NameValuePair> form = new ArrayList<>();
         for (Element input : doc.select("input, select")) {
@@ -1311,7 +1411,7 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
         } catch (OpacErrorException e) {
             return new CancelResult(Status.ERROR, e.getMessage());
         }
-        for (Element tr : doc.select(".rTable_div tr")) {
+        for (Element tr : getServiceElements(doc)) {
             String url = media.split("\\|")[1].toUpperCase(Locale.GERMAN);
             String sp = "SZM";
             if (url.contains("SP=")) {
@@ -1377,6 +1477,7 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
             doc = htmlGet(opac_url + ";jsessionid=" + s_sid + "?service="
                     + s_service + getSpParams("SBK"));
         } else {
+            logInfo("%s - url %s, jessionid %s", "login", opac_url, s_sid);
             doc = htmlPost(opac_url + ";jsessionid=" + s_sid, accountFormBody);
         }
         doc = handleLoginForm(doc, account);
@@ -1407,20 +1508,12 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
         DateTimeFormatter fmt = DateTimeFormat.forPattern("dd.MM.yyyy").withLocale(Locale.GERMAN);
 
         // Ausleihen
-        String alink = null;
-        int anum = 0;
+        Ausleihen ausleihen = getAusleihen(doc);
         List<LentItem> lent = new ArrayList<>();
-        for (Element tr : doc.select(".rTable_div tr")) {
-            if (tr.select("a").size() == 1) {
-                if (tr.select("a").first().absUrl("href").contains("sp=SZA")) {
-                    alink = tr.select("a").first().absUrl("href");
-                    anum = Integer.parseInt(tr.child(0).text().replaceAll("[^\\d]", "").trim());
-                }
-            }
-        }
-        if (alink != null) {
-            Document adoc = htmlGet(alink);
-            s_alink = alink;
+
+        if (ausleihen.alink != null) {
+            Document adoc = htmlGet(ausleihen.alink);
+            s_alink = ausleihen.alink;
             List<NameValuePair> form = new ArrayList<>();
             String prolongTest = null;
             for (Element input : adoc.select("input, select")) {
@@ -1445,8 +1538,8 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
                     adoc = adoc_new;
                 }
             }
-            parseMediaList(adoc, alink, lent, split_title_author);
-            assert (lent.size() == anum);
+            parseMediaList(adoc, ausleihen.alink, lent, split_title_author);
+            assert (lent.size() == ausleihen.anum);
             form = new ArrayList<>();
             boolean cancelButton = false;
             for (Element input : adoc.select("input, select")) {
@@ -1470,15 +1563,16 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
             }
             doc = htmlPost(opac_url + ";jsessionid=" + s_sid, form);
         } else {
-            assert (anum == 0);
+            assert (ausleihen.anum == 0);
         }
 
         adata.setLent(lent);
 
+        Reservierungen reservierungen = getReservierungen(doc);
+        /*
         List<String[]> rlinks = new ArrayList<>();
         int rnum = 0;
-        List<ReservedItem> res = new ArrayList<>();
-        for (Element tr : doc.select(".rTable_div tr")) {
+        for (Element tr : getServiceElements(doc)) {
             if (tr.select("a").size() == 1) {
                 if ((tr.text().contains("Reservationen")
                         || tr.text().contains("Vormerkung")
@@ -1495,7 +1589,10 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
                 }
             }
         }
-        for (String[] rlink : rlinks) {
+        */
+
+        List<ReservedItem> res = new ArrayList<>();
+        for (String[] rlink : reservierungen.rlinks) {
             Document rdoc = htmlGet(rlink[1]);
             boolean error =
                     parseReservationList(rdoc, rlink, split_title_author, res, fmt, stringProvider);
@@ -1527,11 +1624,86 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
             htmlPost(opac_url + ";jsessionid=" + s_sid, form);
         }
 
-        assert (res.size() == rnum);
+        assert (res.size() == reservierungen.rnum);
 
         adata.setReservations(res);
 
         return adata;
+    }
+
+    static Elements getServiceElements(Document doc) {
+        return doc.select("#konto-services");
+        /*
+        Elements elements = doc.select("#konto-services");
+        if (elements.size() == 1) {
+            return elements.first();
+        }
+        return null;
+         */
+        // return doc.select(".rTable_div tr");
+    }
+
+    private class Ausleihen {
+        int anum;
+        String alink;
+
+        Ausleihen(int anum, String alink) {
+            this.anum = anum;
+            this.alink = alink;
+        }
+    }
+
+    Ausleihen getAusleihen(Document doc) {
+        Elements serviceElements = getServiceElements(doc);
+        if (serviceElements.size() == 1) {
+            for (Element a : serviceElements.first().select("a")) {
+                String alink = a.absUrl("href");
+                if (alink.contains("sp=S*SZA")) {
+                    int anum = Integer.parseInt(a.text().replaceAll("[^\\d]", "").trim());
+                    return new Ausleihen(anum, alink);
+                }
+            }
+        }
+        return new Ausleihen(0, null);
+    }
+
+    private class Reservierungen {
+        int rnum;
+        List<String[]> rlinks;
+
+        Reservierungen(int rnum, List<String[]> rlinks) {
+            this.rnum = rnum;
+            this.rlinks = rlinks;
+        }
+    }
+
+    Reservierungen getReservierungen(Document doc) {
+        List<String[]> rlinks = new ArrayList<>();
+        int rnum = 0;
+
+        List<ReservedItem> res = new ArrayList<>();
+        Elements serviceElements = getServiceElements(doc);
+        if (serviceElements.size() == 1) {
+            for (Element a: serviceElements.first().select("a")) {
+                String aText = a.text();
+                if ((aText.contains("Reservationen")
+                        || aText.contains("Vormerkung")
+                        || aText.contains("Fernleihbestellung")
+                        || aText.contains("Bereitstellung")
+                        || aText.contains("Bestellw")
+                        || aText.contains("Magazin"))
+                        && !aText.trim().equals("")) {
+
+                    rlinks.add(new String[]{
+                            aText,
+                            a.absUrl("href"),
+                    });
+
+                    rnum += Integer.parseInt(aText.replaceAll("[^\\d]", "").trim());
+                }
+            }
+        }
+        return new Reservierungen(rnum, rlinks);
     }
 
     static boolean parseReservationList(Document doc, String[] rlink, boolean split_title_author,
@@ -1566,33 +1738,8 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
                 ReservedItem item = new ReservedItem();
                 String text = tr.child(colmap.get("title")).html();
                 text = Jsoup.parse(text.replaceAll("(?i)<br[^>]*>", ";")).text();
-                String[] split = text.split(";");
-
-                // Process media type prefix
-                // Format: "[Media Type]"
-                split[0] = split[0].trim();
-                if (split[0].startsWith("[") && split[0].endsWith("]")) {
-                    // set media type
-                    String mediaType = split[0].substring(1, split[0].length() - 1);
-                    if (types.containsKey(mediaType)) {
-                        item.setMediaType(types.get(mediaType));
-                    }
-
-                    // remove media type from array
-                    split = Arrays.copyOfRange(split, 1, split.length);
-                }
-
                 if (split_title_author) {
-                    String[] authorAndTitle = split[0].split("[:/] ");
-
-                    for (int j = 0; j < authorAndTitle.length; j++) {
-                        authorAndTitle[j] = authorAndTitle[j].replaceFirst("([^:;\n]+)[:;\n] (.*)$", "$1").trim();
-                    }
-
-                    item.setTitle(authorAndTitle[0]);
-                    if (authorAndTitle.length > 1) {
-                        item.setAuthor(authorAndTitle[1]);
-                    }
+                    parseItemText(text, "[:/;\n]", split_title_author, item);
                 } else {
                     item.setTitle(text);
                 }
@@ -1650,61 +1797,28 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
         DateTimeFormatter fmt = DateTimeFormat.forPattern("dd.MM.yyyy").withLocale(Locale.GERMAN);
         for (Element tr : adoc.select(".rTable_div tbody tr")) {
             LentItem item = new LentItem();
-
-            String[] split = Jsoup.parse(tr.child(3).html().replaceAll("(?i)<br[^>]*>", "##")).text().split("##");
-
-            // Process media type prefix
-            // Format: "[Media Type]"
-            split[0] = split[0].trim();
-            if (split[0].startsWith("[") && split[0].endsWith("]")) {
-                // set media type
-                String mediaType = split[0].substring(1, split[0].length() - 1);
-                if (types.containsKey(mediaType)) {
-                    item.setMediaType(types.get(mediaType));
-                }
-
-                // remove media type from array
-                split = Arrays.copyOfRange(split, 1, split.length);
-            }
-
-            if (split[0].contains(" / ")) {
-                // Format "Titel / Autor ##Sig##Nr", z.B. normale Ausleihe in Berlin
-
-                // Id is always the last one, but some libraries don't show it
-                // (only Title/Author##Signature)
-                if (split.length > 2) {
-                    String id = split[split.length - 1];
-                    item.setId(id);
-                }
-
-                String[] titleAndAuthor = split[0].split(" / ", 2);
-
-                String title = titleAndAuthor[0];
-                if (split_title_author) {
-                    title = title.replaceFirst("([^:;\n]+)[:;\n](.*)$", "$1");
-                }
-                item.setTitle(title.trim());
-
-                if (titleAndAuthor.length > 1) {
-                    item.setAuthor(titleAndAuthor[1].replaceFirst("([^:;\n]+)[:;\n](.*)$", "$1").trim());
-                }
-            } else {
-                // Format "Autor: Titel - Verlag - ISBN:... ##Nummer", z.B. Fernleihe in Berlin
-                String[] authorAndTitle = split[0].split(": ", 2);
-
-                for (int i = 0; i < authorAndTitle.length; i++) {
-                    authorAndTitle[i] = authorAndTitle[i].replaceFirst("([^:;\n]+)[:;\n] (.*)$", "$1").trim();
-                }
-
-                if (authorAndTitle.length > 1) {
-                    item.setAuthor(authorAndTitle[0]);
-                    item.setTitle(authorAndTitle[1]);
-                } else {
-                    item.setTitle(authorAndTitle[0]);
+            String text = Jsoup.parse(tr.child(3).html().replaceAll("(?i)<br[^>]*>", "#"))
+                               .text();
+            if (text.contains(" / ")) {
+                // Format "Titel / Autor #Sig#Nr", z.B. normale Ausleihe in Berlin
+                parseItemText(text, "[/#\n]", split_title_author, item);
+            } else if (text.contains(":")) {
+                // Format "Autor: Titel - Verlag - ISBN:... #Nummer", z.B. Fernleihe in Berlin
+                String[] split = text.split("#");
+                String[] aut_tit = split[0].split(": ");
+                item.setAuthor(aut_tit[0].replaceFirst("([^:;\n]+)[:;\n](.*)$", "$1").trim());
+                if (aut_tit.length > 1) {
+                    item.setTitle(
+                            aut_tit[1].replaceFirst("([^:;\n]+)[:;\n](.*)$", "$1").trim());
                 }
                 //Is always the last one...
                 String id = split[split.length - 1];
                 item.setId(id);
+            } else {
+                // Format "Titel #Sig#Nr", z.B. normale Ausleihe Stuttgart aber ohne Author
+                parseItemText(text, "[/#\n]", split_title_author, item);
+                // Author fehlt in diesem Fall
+                item.setAuthor(null );
             }
             String date = tr.child(1).text().trim();
             if (date.contains("-")) {
@@ -1735,6 +1849,143 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
 
             lent.add(item);
         }
+    }
+
+    /**
+     * Sets Title, Autor and MediaType in AccountItem
+     *
+     * @param text               Textzeile mit Titel, Author etc und Id
+     * @param seps               separetors
+     * @param split_title_author switch whether to split title and author
+     * @param item               Reserved- or LentItem in dem Title und Mediatype abgelegt werden
+     *                           sollen
+     */
+    static void parseItemText(String text, String seps, boolean split_title_author, AccountItem item) {
+        final char HAKEN = (char) 172;
+        final char SPACE = (char) 32; // " ".charAt(0);
+
+        final String[] split = text.split(seps);
+
+        MediaType mediaType = checkType(split[0], true);
+        int indexTitle = 0;
+        if ((mediaType!=null) && (mediaType != MediaType.UNKNOWN)) {
+            indexTitle = 1;
+        }
+        String title = split[indexTitle];
+
+        if (split_title_author) {
+            title = title.replaceFirst("([^:;\n]+)[:;\n](.*)$", "$1");
+        }
+
+        // merkwürdiger Haken zwischen Wörtern in StB-Stuttgart durch Space ersetzen
+        // mehrfache Leerzeichen durch ein Space ersetzen
+        // Space am Anfang und Ende entfernen
+        // title = title.replace(HAKEN, SPACE);
+        char[] t2ca = new char[title.length()];
+        boolean lastCharWasSpace = true;
+        int j = 0;
+        for (int i = 0; i < title.length(); i++) {
+            char nextChar = title.charAt(i);
+            if (nextChar == HAKEN) {
+                nextChar = SPACE;
+            }
+            if (lastCharWasSpace && (nextChar == SPACE)) {
+            } else {
+                t2ca[j] = nextChar;
+                j++;
+                lastCharWasSpace = (nextChar == SPACE);
+            }
+        }
+        if (lastCharWasSpace) {
+            j--;
+        }
+        title = new String(t2ca, 0, j);
+
+        // Leading/Trailing Spaces entfernen
+        // title = title.trim();
+        setTitleAndType(item, mediaType, title);
+
+        // Author
+        int indexAutor = indexTitle+1;
+        if (indexAutor < split.length) {
+            String author = split[indexAutor];
+            if (mediaType == MediaType.DVD) {
+                author =  stripRegie(split[indexAutor]);
+            } else {
+                author = author.replaceFirst("([^:;\n]+)[:;\n](.*)$", "$1").trim();
+            }
+            item.setAuthor(author);
+        }
+
+        // id is always the last one...
+        String id = split[split.length - 1];
+        item.setId(id);
+    }
+
+    /**
+     *
+     * @param text
+     * @param only true: text soll nur aus Mediatype(key) und [] bestehen
+     *             false: text soll mit [Mediatype(key)] beginnen
+     * @return
+     */
+    private static MediaType checkType(String text, boolean only) {
+        if (text.startsWith("[")) {
+            int ei = text.indexOf("]");
+            if ( (ei > 0) && (!only || (ei+1 == text.length()))) {
+                String type = text.substring(1, ei);
+                if (types.containsKey(type)) {
+                    // [...] mit bekannten key
+                    return types.get(type);
+                } else {
+                    // [...] aber ... unbekannt
+                    return MediaType.UNKNOWN;
+                }
+            }
+        }
+        // kein [...]
+        return null;
+    }
+
+    private static void setTitleAndType(AccountItem item, MediaType mediaType, String title) {
+        final char SPACE = (char) 32; // " ".charAt(0);
+
+        // Prefix MediaType "[...] ..." entfernen, z.B. "[DVD-Video] ..." am Anfang
+        if (mediaType == null) {
+            checkType(title, false);
+        }
+        if (mediaType == null) {
+            // Default MediaType is BOOK
+            item.setMediaType(MediaType.BOOK);
+        } else {
+            item.setMediaType(mediaType);
+        }
+
+        // Postfix MediaType "... [...]" entfernen, z. B. "... [CD]" am Ende
+        if (title.endsWith("]")) {
+            int ei = title.lastIndexOf("[");
+            if (ei > 0) {
+                String type = title.substring(ei + 1, title.length() - 1);
+                if (types.containsKey(type)) {
+                    item.setMediaType(types.get(type));
+                    do {
+                        ei--;
+                    } while (title.charAt(ei) == SPACE);
+                    title = title.substring(0, ei + 1);
+                } else {
+                    if (item.getMediaType() == null) {
+                        item.setMediaType(MediaType.UNKNOWN);
+                    }
+                }
+                // title = title.trim();
+            }
+        }
+        if (item.getMediaType() == null) {
+            // default
+            item.setMediaType(MediaType.BOOK);
+        }
+
+        item.setTitle(title);
     }
 
     protected Document handleLoginForm(Document doc, Account account)
@@ -1866,9 +2117,16 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
                     if (label == null && row.select("select").size() == 1) {
                         label = row.select("label").first();
                     }
-                    if (label != null) field.setDisplayName(label.text());
+                    if (label != null) {
+                        field.setDisplayName(label.text());
+                        if (field.getDisplayName().matches("Verf.+gbarkeit")) {
+                            field.setMeaning(SearchField.Meaning.AVAILABLE);
+                        }
+                    }
                     for (Element opt : select.select("option")) {
-                        field.addDropdownValue(opt.attr("value"), opt.text());
+                        if (!"Bitte auswählen".equals(opt.val())) {
+                            field.addDropdownValue(opt.attr("value"), opt.text());
+                        }
                     }
                     if (field.getDisplayName().equals("oder Bezirk") ||
                             field.getDisplayName().equals("oder Bibliothek")) {
@@ -1983,4 +2241,11 @@ public class Adis extends OkHttpBaseApi implements OpacApi {
         return null;
     }
 
+    private static void logInfo(String format, Object... args) {
+        if (!LOGGER.isLoggable(Level.INFO)) {
+            return;
+        }
+        String msg = String.format(format, args);
+        LOGGER.log(Level.INFO, msg);
+    }
 }

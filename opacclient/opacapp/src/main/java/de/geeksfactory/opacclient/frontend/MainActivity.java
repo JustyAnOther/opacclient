@@ -53,6 +53,7 @@ import de.geeksfactory.opacclient.R;
 import de.geeksfactory.opacclient.barcode.BarcodeScanIntegrator;
 import de.geeksfactory.opacclient.objects.Account;
 import de.geeksfactory.opacclient.objects.LentItem;
+import de.geeksfactory.opacclient.objects.SearchResult;
 import de.geeksfactory.opacclient.reminder.Alarm;
 import de.geeksfactory.opacclient.reminder.ReminderBroadcastReceiver;
 import de.geeksfactory.opacclient.searchfields.SearchField;
@@ -65,7 +66,7 @@ import de.geeksfactory.opacclient.storage.SearchFieldDataSource;
 import de.geeksfactory.opacclient.webservice.LibraryConfigUpdateService;
 
 public class MainActivity extends OpacActivity
-        implements SearchFragment.Callback, StarredFragment.Callback,
+        implements SearchFragment.Callback, StarredFragment.Callback, HistoryFragment.Callback,
         SearchResultDetailFragment.Callbacks {
 
     public static final String EXTRA_FRAGMENT = "fragment";
@@ -566,7 +567,7 @@ public class MainActivity extends OpacActivity
     }
 
     @Override
-    public void showDetail(String mNr) {
+    public void showDetail(String mNr, SearchResult.MediaType mediaType) {
         if (isTablet()) {
             rightFragment = new SearchResultDetailFragment();
             Bundle args = new Bundle();
@@ -581,6 +582,10 @@ public class MainActivity extends OpacActivity
         } else {
             Intent intent = new Intent(this, SearchResultDetailActivity.class);
             intent.putExtra(SearchResultDetailFragment.ARG_ITEM_ID, mNr);
+            if (mediaType!= null) {
+                intent.putExtra(SearchResultDetailFragment.ARG_ITEM_MEDIATYPE,
+                        mediaType.toString());
+            }
             intent.putExtra(SearchResultDetailFragment.ARG_ITEM_LIBRARY_IDENT, app.getLibrary().getIdent());
             startActivity(intent);
         }

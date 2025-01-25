@@ -29,6 +29,7 @@ import android.widget.ScrollView;
 import android.widget.Spinner;
 import android.widget.TextView;
 
+import org.droidparts.widget.ClearableEditText;
 import org.json.JSONException;
 
 import java.io.IOException;
@@ -245,12 +246,34 @@ public class SearchFragment extends Fragment implements AccountSelectedListener 
                             R.layout.searchfield_text, llFormFields, false);
                     TextView title = v.findViewById(R.id.title);
                     title.setText(textSearchField.getDisplayName());
-                    EditText edittext = v
+                    final EditText edittext = v
                             .findViewById(R.id.edittext);
                     edittext.setHint(textSearchField.getHint());
                     if (((TextSearchField) field).isNumber()) {
                         edittext.setInputType(InputType.TYPE_CLASS_NUMBER);
                     }
+
+                    ImageView ivDelete = (ImageView) v
+                            .findViewById(R.id.ivDelete);
+                    if(ivDelete!=null) {
+                        ivDelete.setOnClickListener(new OnClickListener() {
+                            @Override
+                            public void onClick(View arg0) {
+                                edittext.setText("");
+                            }
+                        });
+                    }
+
+                    if (edittext instanceof ClearableEditText) {
+                        ClearableEditText clearableEditText = (ClearableEditText) edittext;
+                        clearableEditText.setListener(new ClearableEditText.Listener() {
+                            @Override
+                            public void didClearText() {
+                                // whatever
+                            }
+                        });
+                    }
+
                     if (((TextSearchField) field).isHalfWidth()
                             && i >= 1
                             && !(fields.get(i - 1) instanceof TextSearchField &&

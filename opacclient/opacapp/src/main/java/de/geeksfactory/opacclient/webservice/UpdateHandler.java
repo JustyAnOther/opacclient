@@ -1,6 +1,8 @@
 package de.geeksfactory.opacclient.webservice;
 
 
+import android.util.Log;
+
 import org.joda.time.DateTime;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -46,8 +48,21 @@ public class UpdateHandler {
             if (lib == null) {
                 continue;
             }
+            Log.i("updateConfig", lib.getIdent());
             String filename = lib.getIdent() + ".json";
             JSONObject json = lib.toJSON();
+            if ("Stuttgart".equals(lib.getIdent())) {
+                Log.i("updateConfig", json.toString());
+                JSONObject jsonData = json.getJSONObject("data");
+                final String oldUrl = "https://opac.sbs.stuttgart.de/aDISWeb/app";
+                final String baseUrl = jsonData.getString("baseurl");
+                if (oldUrl.equals(baseUrl)) {
+                    final String newUrl = "https://stadtbibliothek-stuttgart.de/aDISWeb/app";
+                    jsonData.put("baseurl", newUrl);
+                    json.put("data", jsonData);
+                    Log.i("updateConfig", json.toString());
+                }
+            }
             output.writeFile(filename, json.toString());
 
             if (searchFields.hasSearchFields(lib.getIdent())) {

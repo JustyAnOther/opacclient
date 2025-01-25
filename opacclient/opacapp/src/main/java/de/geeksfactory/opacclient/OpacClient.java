@@ -48,10 +48,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
 import androidx.multidex.MultiDex;
+import de.geeksfactory.opacclient.apis.Adis;
 import androidx.preference.PreferenceManager;
 import de.geeksfactory.opacclient.apis.OpacApi;
 import de.geeksfactory.opacclient.frontend.AccountListActivity;
@@ -59,6 +62,7 @@ import de.geeksfactory.opacclient.frontend.LibraryListActivity;
 import de.geeksfactory.opacclient.frontend.MainActivity;
 import de.geeksfactory.opacclient.frontend.MainPreferenceActivity;
 import de.geeksfactory.opacclient.frontend.SearchResultListActivity;
+import de.geeksfactory.opacclient.frontend.StarredFragment;
 import de.geeksfactory.opacclient.i18n.AndroidStringProvider;
 import de.geeksfactory.opacclient.networking.AndroidHttpClientFactory;
 import de.geeksfactory.opacclient.objects.Account;
@@ -67,6 +71,7 @@ import de.geeksfactory.opacclient.reminder.SyncAccountJob;
 import de.geeksfactory.opacclient.searchfields.SearchField;
 import de.geeksfactory.opacclient.searchfields.SearchQuery;
 import de.geeksfactory.opacclient.storage.AccountDataSource;
+import de.geeksfactory.opacclient.storage.HistoryContentProvider;
 import de.geeksfactory.opacclient.storage.PreferenceDataSource;
 import de.geeksfactory.opacclient.storage.StarContentProvider;
 import de.geeksfactory.opacclient.utils.DebugTools;
@@ -81,6 +86,8 @@ import io.sentry.core.Sentry;
 
 public class OpacClient extends Application {
 
+    private static final Logger LOGGER = Logger.getLogger(OpacClient.class.getName());
+
     public static final String PREF_SELECTED_ACCOUNT = "selectedAccount";
     public static final String PREF_HOME_BRANCH_PREFIX = "homeBranch_";
     public static final String ASSETS_BIBSDIR = "bibs";
@@ -94,6 +101,7 @@ public class OpacClient extends Application {
     private static OpacClient instance;
     public final boolean SLIDING_MENU = true;
     private final Uri STAR_PROVIDER_STAR_URI = StarContentProvider.STAR_URI;
+    private final Uri HISTORY_PROVIDER_HIST_URI = HistoryContentProvider.HIST_URI;
     protected Account account;
     protected OpacApi api;
     protected Library library;
@@ -169,6 +177,10 @@ public class OpacClient extends Application {
 
     public Uri getStarProviderStarUri() {
         return STAR_PROVIDER_STAR_URI;
+    }
+
+    public Uri getHistoryProviderHistoryUri() {
+        return HISTORY_PROVIDER_HIST_URI;
     }
 
     public void addFirstAccount(Activity activity) {
@@ -274,21 +286,55 @@ public class OpacClient extends Application {
     }
 
     public Library getLibrary(String ident) throws IOException, JSONException {
+
+        final String methodName = "getLibrary";
+
         String filename = ident + ".json";
-        String json;
 
         File filesDir = getLibrariesDir();
+        LOGGER.log(Level.INFO, String.format("%s - filesDir %s, fileName %s"
+                , methodName, filesDir, filename));
         PreferenceDataSource prefs = getPreferenceDataSource();
 
+        if (prefs.hasBundledConfiguration()) {
+            LOGGER.log(Level.INFO, String.format("%s - prefs.lastLibraryConfigUpdateVersion = %s"
+                    , methodName, prefs.getLastLibraryConfigUpdateVersion()));
+        }
+
+        String json;
         if (fileExists(filesDir, filename) && (
                 !prefs.hasBundledConfiguration() ||
                         prefs.getLastLibraryConfigUpdateVersion() == BuildConfig.VERSION_CODE)) {
             // only use files if they were downloaded using the current app version
+            LOGGER.log(Level.INFO, String.format("%s - filesDir %s, fileName %s"
+                    , methodName, filesDir, filename));
             json = Utils.readStreamToString(openFile(filesDir, filename));
         } else {
+            LOGGER.log(Level.INFO, String.format("%s - ASSETS_BIBSDIR %s, fileName %s"
+                    , methodName, ASSETS_BIBSDIR, filename));
             json = Utils.readStreamToString(getAssets().open(ASSETS_BIBSDIR + "/" + filename));
         }
-        return Library.fromJSON(ident, new JSONObject(json));
+        JSONObject jsonObject = new JSONObject(json);
+        JSONObject jsonData = jsonObject.getJSONObject("data");
+        if (jsonData.has("baseurl")) {
+            String baseurl = jsonData.getString("baseurl");
+            LOGGER.log(Level.INFO, String.format("%s - baseurl = %s", methodName, baseurl));
+
+            final String oldUrl = "https://opac.sbs.stuttgart.de/aDISWeb/app";
+            final String baseUrl = jsonData.getString("baseurl");
+            if (oldUrl.equals(baseUrl)) {
+                final String newUrl = "https://stadtbibliothek-stuttgart.de/aDISWeb/app";
+                jsonData.put("baseurl", newUrl);
+                jsonObject.put("data", jsonData);
+                Log.i(methodName, json.toString() + " android.util.Log.i");
+                LOGGER.log(Level.INFO, String.format("%s - newUrl = %s (java.util.logger.log(INFO...)", methodName, newUrl));
+            }
+
+        } else {
+            LOGGER.log(Level.INFO, String.format("%s - baseurl not set. json = %s"
+                    , methodName, json));
+        }
+        return Library.fromJSON(ident, jsonObject);
     }
 
     @NonNull
@@ -394,6 +440,12 @@ public class OpacClient extends Application {
         GooglePlayTools.updateSecurityProvider(getApplicationContext());
 
         sp = PreferenceManager.getDefaultSharedPreferences(this);
+
+        // Starred-Preferences: reset for keys which should not survive a restart
+        SharedPreferences.Editor editor = sp.edit();
+        editor.remove(StarredFragment.STATE_ACTIVATED_POSITION);
+        editor.remove(StarredFragment.STATE_FILTER_BRANCH);
+        editor.apply();
 
         if (BuildConfig.SENTRY_DSN != null) {
             SentryAndroid.init(this, options -> {
