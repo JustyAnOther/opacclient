@@ -121,8 +121,8 @@
     <string name="info_starred_updated">Import complete.</string>
     <string name="info_history_updated">History import complete.</string>
     <string name="info_history_updated_count">History import complete. %1$d new items, %2$d changed items</string>
-    <string name="history_header">%1$d items</string>
-    <string name="history_header_sort">%1$d items, sorted %2$s %3$s</string>
+    <string name="history_header">%1$d %2$s</string>
+    <string name="history_header_sort">%1$d %2$s, sorted %3$s %4$s</string>
     <string name="connection_error_detail">The connection to the library server failed. Please check your internet connection. If the problem persists, there may have been a problem on the library server or the app was unable to parse the server\'s response.</string>
     <string name="connection_error_detail_nre">The connection to the library server failed. Please check your internet connection. If the problem persists, there may have been a problem on the library server.</string>
     <string name="retry">Try again</string>
@@ -189,6 +189,10 @@
     <string name="export_starred_to_storage">Export</string>
     <string name="import_starred_from_storage">Import</string>
     <string name="filter_starred">Filter</string>
+    <string name="sort_star_author">by author</string>
+    <string name="sort_star_title">by title</string>
+    <string name="sort_star_date">by add date</string>
+    <string name="sort_star_mediatype">by media type</string>
     <string name="share_history">Share</string>
     <string name="export_history_to_storage">Export</string>
     <string name="import_history_from_storage">Import</string>
@@ -381,15 +385,41 @@
     <string name="starred_refresh_branches">Refresh status</string>
     <string name="starred_filter_no_branch">Without Branch</string>
     <string name="starred_filter_no_branch_count">Without Branch (%1$d)</string>
-    <string name="starred_header_branch">%1$d items in %2$s</string>
-    <string name="starred_header">%1d items</string>
+    <string name="starred_filter_all">All</string>
+    <string name="mediatype_all">All</string>
+    <plurals name="mediatype_default">
+        <item quantity="one">item</item>
+        <item quantity="other">items</item>
+    </plurals>
+    <plurals name="mediatype_BOOK">
+        <item quantity="one">@string/mediatype_book</item>
+        <item quantity="other">books</item>
+    </plurals>
+    <plurals name="mediatype_CD">
+        <item quantity="one">@string/mediatype_cd</item>
+        <item quantity="other">CDs</item>
+    </plurals>
+    <plurals name="mediatype_DVD">
+        <item quantity="one">@string/mediatype_dvd</item>
+        <item quantity="other">DVDs</item>
+    </plurals>
+    <plurals name="mediatype_BLUERAY">
+        <item quantity="one">@string/mediatype_bluray</item>
+        <item quantity="other">Blu-Ray Discs</item>
+    </plurals>
+
+    <string name="starred_header">%1$d %2$s</string>
+    <string name="starred_header_sort">%1$d %2$s, sorted %3$s %4$s</string>
+    <string name="starred_header_branch">%1$d %2$s in %3$s</string>
+    <string name="starred_header_branch_sort">%1$d %2$s in %3$s, sorted %4$s %5$s</string>
+    <string name="starred_header_without_branch">%1d %2$s without branch</string>
+    <string name="starred_header_without_branch_sort">%1$d %2$s without branch, sorted %3$s %4$s</string>
+
     <string name="starred_remove_all">Remove all</string>
     <string name="starred_remove_all_sure">Remove all?</string>
     <string name="starred_remove_all_ok">Yes</string>
     <string name="starred_update_branch_success">Update branches for %1$d items</string>
     <string name="starred_update_branch_fail">Update branches failed %1$s</string>
-    <string name="starred_filter_all">All</string>
-    <string name="starred_without_branch">%1d item without brach</string>
     <string name="starred_up_to_date">The status is up-to-date.</string>
     <plurals name="starred_age_minutes">
         <item quantity="one">The status is one minute old.</item>

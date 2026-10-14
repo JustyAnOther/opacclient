@@ -74,6 +74,7 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 
@@ -98,6 +99,7 @@ import de.geeksfactory.opacclient.searchfields.SearchField;
 import de.geeksfactory.opacclient.searchfields.SearchField.Meaning;
 import de.geeksfactory.opacclient.searchfields.SearchQuery;
 import de.geeksfactory.opacclient.storage.Branch;
+import de.geeksfactory.opacclient.storage.HistoryDatabase;
 import de.geeksfactory.opacclient.storage.JsonSearchFieldDataSource;
 import de.geeksfactory.opacclient.storage.SearchFieldDataSource;
 import de.geeksfactory.opacclient.storage.StarBranchItem;
@@ -106,6 +108,8 @@ import de.geeksfactory.opacclient.storage.StarDataSource;
 import de.geeksfactory.opacclient.storage.StarDatabase;
 import de.geeksfactory.opacclient.storage.Starred;
 import de.geeksfactory.opacclient.utils.CompatibilityUtils;
+import de.geeksfactory.opacclient.utils.EnumFilterMediaType;
+import de.geeksfactory.opacclient.utils.EnumSortDirection;
 import de.geeksfactory.opacclient.utils.Utils;
 
 public class StarredFragment extends Fragment implements
@@ -113,8 +117,12 @@ public class StarredFragment extends Fragment implements
 
     private static final Logger LOGGER = new Logger(StarredFragment.class);
 
+    private static final String STATE_SORT_DIRECTION = "star_sort_direction";
+    private static final String STATE_SORT_OPTION = "star_sort_option";
+
     public static final String STATE_ACTIVATED_POSITION = "activated_position";
     public static final String STATE_FILTER_BRANCH = "filter_branch";
+    public static final String STATE_FILTER_MEDIATYPE = "filter_mediatype";
     public static final String STATE_FILTER_BIB = "filter_bib";
 
     private static final String JSON_LIBRARY_NAME = "library_name";
@@ -140,9 +148,12 @@ public class StarredFragment extends Fragment implements
     private ProgressBar progressBar;
     private SwipeRefreshLayout swipeRefreshLayout;
 
+    private int currentFilterBranchId;
     private static final int FILTER_BRANCH_NONE = -1;
     private static final int FILTER_BRANCH_ALL = 0;
-    private int currentFilterBranchId;
+
+    private SearchResult.MediaType currentFilterMediaType;
+    private static SearchResult.MediaType FILTER_MEDIATYPE_NONE = null;
 
     private static class Logger {
         private String tag;
@@ -161,11 +172,63 @@ public class StarredFragment extends Fragment implements
             String msg = String.format(fmt, args);
             Log.i(tag, msg);
         }
+        public void e(String fmt, Object ... args) {
+            if (!Log.isLoggable(tag, Log.ERROR)) {
+                return;
+            }
+            String msg = String.format(fmt, args);
+            Log.e(tag, msg);
+        }
     }
 
     private static void logDebug(String format, Object ... args) {
         LOGGER.d(format, args);
     }
+    private static void logError(String format, Object ... args) {
+        LOGGER.e(format, args);
+    }
+
+    EnumSortDirection currentSortDirection = null;
+
+    private enum EnumSortOption {
+
+        AUTOR(R.id.action_sort_star_author, R.string.sort_star_author,
+                StarDatabase.STAR_COL_AUTHOR, EnumSortDirection.ASC),
+        TITLE(R.id.action_sort_star_title, R.string.sort_star_title, StarDatabase.STAR_COL_TITLE,
+                EnumSortDirection.ASC),
+        STARDATE(R.id.action_sort_star_date, R.string.sort_star_date,
+                StarDatabase.STAR_COL_DATE),
+        MEDIATYPE(R.id.action_sort_star_mediatype, R.string.sort_star_mediatype,
+                StarDatabase.STAR_COL_MEDIATYPE);
+
+        final int menuId;
+        final int textId;
+        final String column;
+        final EnumSortDirection initialSortDirection;
+
+        private EnumSortOption(int menuId, int textId, String column) {
+            // SortDirection Default ist DESC
+            this(menuId, textId, column, EnumSortDirection.DESC);
+        }
+
+        private EnumSortOption(int menuId, int textId, String column,
+                EnumSortDirection sortDirection) {
+            this.menuId = menuId;
+            this.textId = textId;
+            this.column = column;
+            this.initialSortDirection = sortDirection;
+        }
+
+        public static StarredFragment.EnumSortOption fromMenuId(int menuId) {
+            for (EnumSortOption value : EnumSortOption.values()) {
+                if (value.menuId == menuId) {
+                    return value;
+                }
+            }
+            return null;
+        }
+    }
+    private EnumSortOption currentSortOption = null;
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
@@ -225,6 +288,23 @@ public class StarredFragment extends Fragment implements
         return view;
     }
 
+    public void storeState(Bundle outState) {
+
+        if (outState == null) return;
+        /* in StarredFragment (noch) nicht bekannt
+        if (activatedPosition != AdapterView.INVALID_POSITION) {
+            // Serialize and persist the activated item position.
+            outState.putInt(STATE_ACTIVATED_POSITION, activatedPosition);
+        }
+        */
+        if (currentSortDirection != null) {
+            outState.putString(STATE_SORT_DIRECTION, currentSortDirection.name());
+        }
+        if (currentSortOption != null) {
+            outState.putString(STATE_SORT_OPTION, currentSortOption.name());
+        }
+    }
+
     private void restoreState(Bundle savedInstanceState) {
         SharedPreferences sp = PreferenceManager
                 .getDefaultSharedPreferences(getContext());
@@ -238,6 +318,16 @@ public class StarredFragment extends Fragment implements
         }
 
         currentFilterBranchId = sp.getInt(STATE_FILTER_BRANCH, FILTER_BRANCH_ALL);
+        if (sp.contains(STATE_FILTER_MEDIATYPE)) {
+            String s = sp.getString(STATE_FILTER_MEDIATYPE, null);
+
+            if (s == null) {
+                currentFilterMediaType = FILTER_MEDIATYPE_NONE;
+            } else {
+                currentFilterMediaType = SearchResult.MediaType.valueOf(s);
+            }
+        }
+
         if (sp.contains(STATE_ACTIVATED_POSITION)) {
             setActivatedPosition(sp
                     .getInt(STATE_ACTIVATED_POSITION, AdapterView.INVALID_POSITION));
@@ -253,6 +343,23 @@ public class StarredFragment extends Fragment implements
             if (savedInstanceState.containsKey(STATE_FILTER_BRANCH)) {
                 currentFilterBranchId = savedInstanceState.getInt(STATE_FILTER_BRANCH);
             }
+
+            if (savedInstanceState.containsKey(STATE_FILTER_MEDIATYPE)) {
+                String s = savedInstanceState.getString(STATE_FILTER_MEDIATYPE, null);
+                if (s == null) {
+                    currentFilterMediaType = FILTER_MEDIATYPE_NONE;
+                } else {
+                    currentFilterMediaType = SearchResult.MediaType.valueOf(s);
+                }
+            }
+        }
+        String sortOptionS = sp.getString(STATE_SORT_OPTION, null);
+        if (sortOptionS != null) {
+            currentSortOption = EnumSortOption.valueOf(sortOptionS);
+        }
+        String sortDirectionS = sp.getString(STATE_SORT_DIRECTION, null);
+        if (sortDirectionS != null) {
+            currentSortDirection = EnumSortDirection.valueOf(sortDirectionS);
         }
     }
 
@@ -336,7 +443,7 @@ public class StarredFragment extends Fragment implements
     }
 
     private void addSubMenuBranchesFromDb(android.view.Menu menu) {
-        MenuItem itemFilter = menu.findItem(R.id.action_filter);
+        MenuItem itemFilter = menu.findItem(R.id.action_filter_branch);
         // menu.addSubMenu(Menu.NONE, R.id.action_filter, Menu.NONE,"Menu1");
         SubMenu subMenu = itemFilter.getSubMenu();
 
@@ -356,7 +463,7 @@ public class StarredFragment extends Fragment implements
             return;
         }
 
-        MenuItem itemFilterNoBranch = menu.findItem(R.id.action_filter_no_branch);
+        MenuItem itemFilterNoBranch = menu.findItem(R.id.action_filter_branch_none);
         if (countStarredWithoutBranch > 0) {
             String text = getString(R.string.starred_filter_no_branch_count, countStarredWithoutBranch);
             itemFilterNoBranch.setTitle(text);
@@ -374,7 +481,7 @@ public class StarredFragment extends Fragment implements
     }
 
     private void addSubMenuBranchesFromSearchField(android.view.Menu menu) {
-        MenuItem itemFilter = menu.findItem(R.id.action_filter);
+        MenuItem itemFilter = menu.findItem(R.id.action_filter_branch);
         // menu.addSubMenu(Menu.NONE, R.id.action_filter, Menu.NONE,"Menu1");
         SubMenu subMenu = itemFilter.getSubMenu();
         SearchField field = findSearchField(Meaning.BRANCH);
@@ -433,7 +540,7 @@ public class StarredFragment extends Fragment implements
             swipeRefreshLayout.setRefreshing(true);
             refreshBranches();
             return true;
-        } else if (item.getItemId() == R.id.action_filter) {
+        } else if (item.getItemId() == R.id.action_filter_branch) {
             return super.onOptionsItemSelected(item);
         } else if (item.getItemId() == R.id.action_remove_all) {
             if (true) {
@@ -443,43 +550,82 @@ public class StarredFragment extends Fragment implements
             }
             refreshViewAfterChange();
             return true;
-        } else if (item.getItemId() == R.id.action_filter_no_branch) {
+        } else if (item.getItemId() == R.id.action_filter_branch_none) {
             currentFilterBranchId = FILTER_BRANCH_NONE;
             refreshViewAfterChange();
             return true;
 
-        } else if (item.getItemId() == R.id.action_filter_all) {
+        } else if (item.getItemId() == R.id.action_filter_branch_all) {
             // clear selection
             currentFilterBranchId = FILTER_BRANCH_ALL;
             refreshViewAfterChange();
             return true;
-
+        } else if (item.getItemId() == R.id.action_filter_mediatype) {
+            // Hauptmenüpunkt, do nothing
+            return super.onOptionsItemSelected(item);
+        } else if (item.getItemId() == R.id.action_sort) {
+            // Hauptmenüpunkt, do nothing
+            return super.onOptionsItemSelected(item);
         } else {
-            // Hier FilterSubMenu
-            if (item.getItemId() == currentFilterBranchId) {
-                // Bereits ausgewählt:  Do nothing
+            EnumSortOption sortOption = EnumSortOption.fromMenuId(item.getItemId());
+            if (sortOption != null) {
+                sort(sortOption);
                 return true;
-            } else {
-                // new selection
-                currentFilterBranchId = item.getItemId();
+            }
 
-                StarDataSource data = new StarDataSource(getActivity());
-                data.updateBranchFiltertimestamp(item.getItemId(), new Date().getTime());
-
+            EnumFilterMediaType filterOption = EnumFilterMediaType.fromMenuId(item.getItemId());
+            if (filterOption != null) {
+                currentFilterMediaType = filterOption.getMediaType();
                 refreshViewAfterChange();
                 return true;
             }
+
+            // ab hier Branch-FilterSubMenu
+            if (item.getItemId() == currentFilterBranchId) {
+                // Bereits ausgewählt:  Do nothing
+                return super.onOptionsItemSelected(item);
+            }
+
+            // new selection
+            currentFilterBranchId = item.getItemId();
+
+            /* Filtertimestamp wird nicht benutzt
+            StarDataSource data = new StarDataSource(getActivity());
+            data.updateBranchFiltertimestamp(item.getItemId(), new Date().getTime());
+            */
+
+            refreshViewAfterChange();
+            return true;
         }
+    }
+
+    private void sort(EnumSortOption sortOption) {
+
+        if (currentSortOption == sortOption) {
+            // bereits nach dieser Spalte sortiert
+            // d.h. ASC/DESC swappen
+            currentSortDirection = currentSortDirection.swap();
+        } else {
+            currentSortOption = sortOption;
+            currentSortDirection = sortOption.initialSortDirection;
+        }
+
+        // Loader restarten
+        getActivity().getSupportLoaderManager().restartLoader(LOADER_ID, null, this);
+
+        // Header aktualisieren
+        // updateHeader(); unnötig, wird via onLoadFinished aufgerufen
     }
 
     @Override
     public void accountSelected(Account account) {
         currentFilterBranchId = FILTER_BRANCH_ALL;
+        currentFilterMediaType = FILTER_MEDIATYPE_NONE;
         refreshViewAfterChange();
     }
 
     private void refreshViewAfterChange() {
-        updateHeader();
+        updateHeader(); // Notwendig? Oder wird das wird via onLoadFinished aufgerufen
         getActivity().invalidateOptionsMenu();
         LoaderManager.getInstance(this).restartLoader(LOADER_ID, null, this);
     }
@@ -544,6 +690,7 @@ public class StarredFragment extends Fragment implements
                 data.removeAll(bib);
 
                 currentFilterBranchId = FILTER_BRANCH_ALL;
+                currentFilterMediaType = FILTER_MEDIATYPE_NONE;
                 refreshViewAfterChange();
             }
         });
@@ -572,6 +719,7 @@ public class StarredFragment extends Fragment implements
                                data.removeAll(bib);
 
                                currentFilterBranchId = FILTER_BRANCH_ALL;
+                               currentFilterMediaType = FILTER_MEDIATYPE_NONE;
 
                                refreshViewAfterChange();
                            }
@@ -599,31 +747,39 @@ public class StarredFragment extends Fragment implements
 
         final String bib = app.getLibrary().getIdent();
 
+        String sortOrder = null;
+        if (currentSortOption != null) {
+            sortOrder = currentSortOption.column + " " + currentSortDirection.getSqlText();
+        }
+
+        String selection;
+        String[] selectionArgs;
+
         if (currentFilterBranchId == FILTER_BRANCH_ALL) {
             // Nur auf Library selektieren
-            return new CursorLoader(getActivity(),
-                    StarContentProvider.STAR_JOIN_STAR_BRANCH_URI,
-                    StarDataSource.STAR_BRANCH_PROJECTION,
-                    StarDatabase.STAR_WHERE_LIB,
-                    new String[]{bib},
-                    null);
+            selection = StarDatabase.STAR_WHERE_LIB;
+            selectionArgs = new String[]{bib};
         } else if (currentFilterBranchId == FILTER_BRANCH_NONE) {
             // Auf Library und id_branch = null selektieren
-            return new CursorLoader(getActivity(),
-                    StarContentProvider.STAR_JOIN_STAR_BRANCH_URI,
-                    StarDataSource.STAR_BRANCH_PROJECTION,
-                    StarDatabase.STAR_WHERE_LIB_BRANCH_IS_NULL,
-                    new String[]{bib},
-                    null);
+            selection = StarDatabase.STAR_WHERE_LIB_BRANCH_IS_NULL;
+            selectionArgs = new String[]{bib};
         } else {
             // Auf Library und id_branch selektieren
-            return new CursorLoader(getActivity(),
-                    StarContentProvider.STAR_JOIN_STAR_BRANCH_URI,
-                    StarDataSource.STAR_BRANCH_PROJECTION,
-                    StarDatabase.STAR_WHERE_LIB_BRANCH,
-                    new String[]{bib, Integer.toString(currentFilterBranchId)},
-                    null);
+            selection = StarDatabase.STAR_WHERE_LIB_BRANCH;
+            selectionArgs = new String[]{bib, Integer.toString(currentFilterBranchId)};
         }
+
+        if (currentFilterMediaType != null) {
+            selection = selection + " and mediatype = ?";
+            selectionArgs = Arrays.copyOf(selectionArgs, selectionArgs.length+1);
+            selectionArgs[selectionArgs.length-1] = currentFilterMediaType.name();
+        }
+        return new CursorLoader(getActivity(),
+                StarContentProvider.STAR_JOIN_STAR_BRANCH_URI,
+                StarDataSource.STAR_BRANCH_PROJECTION,
+                selection,
+                selectionArgs,
+                sortOrder);
     }
 
     @Override
@@ -650,21 +806,54 @@ public class StarredFragment extends Fragment implements
             return;
         }
 
-        String text = null;
+        String sortColumnText = null;
+        String sortDirectionText = null;
+        if (currentSortOption != null) {
+            sortColumnText = getString(currentSortOption.textId);
+            sortDirectionText = getString(currentSortDirection.getTextId());
+        }
+
         int countItems = adapter.getCount();
+
+        // item/items bzw. Medium/Medien
+        String mediatypeName = getResources().getQuantityString(R.plurals.mediatype_default, countItems);
+        if (currentFilterMediaType != null) {
+            String key = "mediatype_" + currentFilterMediaType.name();
+            String packageName = getContext().getPackageName();
+            int resId = getResources().getIdentifier(key, "plurals", packageName);
+            mediatypeName = getResources().getQuantityString(resId, countItems);
+        }
+
+        String text = null;
         if (currentFilterBranchId == FILTER_BRANCH_ALL) {
-            text = getString(R.string.starred_header, countItems);
+            if (currentSortOption == null) {
+                text = getString(R.string.starred_header, countItems, mediatypeName);
+            } else {
+                text = getString(R.string.starred_header_sort, countItems, mediatypeName
+                        , sortColumnText, sortDirectionText);
+            }
         } else if (currentFilterBranchId == FILTER_BRANCH_NONE) {
-            text = getString(R.string.starred_without_branch, countItems);
+            if (currentSortOption == null) {
+                text = getString(R.string.starred_header_without_branch_sort, countItems
+                        ,mediatypeName, sortColumnText, sortDirectionText);
+            } else {
+                text = getString(R.string.starred_header_without_branch, countItems, mediatypeName);
+            }
         } else {
             StarDataSource data = new StarDataSource(getActivity());
             String bib = app.getLibrary().getIdent();
             Branch branch = data.getBranch(bib, currentFilterBranchId);
             if (branch == null) {
-                logDebug("No Branch for bib=%s branchId=%d", bib, currentFilterBranchId);
+                logError("No Branch for bib=%s branchId=%d", bib, currentFilterBranchId);
+                return;
             }
-            text = getString(R.string.starred_header_branch, countItems,
-                    branch.getName());
+            if (currentSortOption == null) {
+                text = getString(R.string.starred_header_branch, countItems, mediatypeName,
+                        branch.getName());
+            } else {
+                text = getString(R.string.starred_header_branch_sort, countItems, mediatypeName,
+                        branch.getName(), sortColumnText, sortDirectionText);
+            }
             long minStatusTime = branch.getMinStatusTime();
             if (minStatusTime>0) {
                 text = text + " (" + getAge(minStatusTime) + ")";
@@ -982,11 +1171,21 @@ public class StarredFragment extends Fragment implements
             if (currentFilterBranchId != 0) {
                 editor.putInt(STATE_FILTER_BRANCH, currentFilterBranchId);
             }
+            if (currentFilterMediaType != null) {
+                editor.putString(STATE_FILTER_MEDIATYPE, currentFilterMediaType.name());
+            }
 
             int activatedPosition = listView.getFirstVisiblePosition();
             if (activatedPosition != AdapterView.INVALID_POSITION) {
                 // Serialize and persist the activated item position.
                 editor.putInt(STATE_ACTIVATED_POSITION, activatedPosition);
+            }
+
+            if (currentSortOption != null) {
+                editor.putString(STATE_SORT_OPTION, currentSortOption.name());
+            }
+            if (currentSortDirection != null) {
+                editor.putString(STATE_SORT_DIRECTION, currentSortDirection.name());
             }
 
             editor.apply();
@@ -1024,6 +1223,9 @@ public class StarredFragment extends Fragment implements
         }
         if (currentFilterBranchId > 0) {
             outState.putInt(STATE_FILTER_BRANCH, currentFilterBranchId);
+        }
+        if (currentFilterMediaType != null) {
+            outState.putString(STATE_FILTER_MEDIATYPE, currentFilterMediaType.name());
         }
     }
 

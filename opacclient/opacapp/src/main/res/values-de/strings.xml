@@ -379,22 +379,25 @@
     <string name="history_remove_all">Alle löschen</string>
     <string name="history_remove_all_sure">Bist du sicher? (Kein rückgängig möglich)</string>
     <string name="history_remove_all_prefs">Sollen die Verleih-Chroniken zu allen Bibliotheken gelöscht werden? (Kein rückgängig möglich)</string>
-    <string name="history_header">%1$d Medien</string>
-    <string name="history_header_sort">%1$d Medien, %2$s %3$s sortiert</string>
+    <string name="history_header">%1$d %2$s</string>
+    <string name="history_header_sort">%1$d %2$s, %3$s %4$s sortiert</string>
     <string name="sort_direction_asc">aufsteigend</string>
     <string name="sort_direction_desc">absteigend</string>
     <string name="history_prolongCount">Anzahl Verlängerungen</string>
     <string name="starred_refresh_branches">Status aktualisieren</string>
     <string name="starred_filter_no_branch">Ohne Zweigstelle</string>
     <string name="starred_filter_no_branch_count">Ohne Zweigstelle (%1$d)</string>
-    <string name="starred_header_branch">%1$d Medien in %2$s</string>
-    <string name="starred_header">%1d Medien</string>
+    <string name="starred_header_branch">%1$d %2$s in %3$s</string>
+    <string name="starred_header">%1d %2$s</string>
     <string name="starred_remove_all">Alle löschen</string>
     <string name="starred_remove_all_ok">Ja</string>
     <string name="starred_update_branch_success">Bei %1$d  Medien wurden der Status aktualisiert</string>
     <string name="starred_update_branch_fail">Fehler beim Aktualisieren der Stati (%1$s)</string>
     <string name="starred_filter_all">Alle</string>
-    <string name="starred_without_branch">%1d Medien ohne Zweigstelle</string>
+    <string name="starred_header_without_branch">%1$d %2$s ohne Zweigstelle</string>
+    <string name="starred_header_branch_sort">%1$d %2$s in %3$s, sortiert %4$s %5$s</string>
+    <string name="starred_header_sort">%1$d %2$s, sortiert %3$s %4$s</string>
+    <string name="starred_header_without_branch_sort">%1$d %2$s ohne Zweigstelle, sortiert %3$s %4$s</string>
     <string name="starred_remove_all_sure">Alle löschen?</string>
     <string name="starred_up_to_date">Der Status ist aktuell</string>
     <plurals name="starred_age_minutes">
@@ -408,5 +411,30 @@
     <plurals name="starred_age_days">
         <item quantity="one">Der Status ist einen Tag alt.</item>
         <item quantity="other">Der Status ist %d Tage alt.</item>
+    </plurals>
+    <string name="sort_star_author">nach Autor</string>
+    <string name="sort_star_title">nach Titel</string>
+    <string name="sort_star_date">nach Merkdatum</string>
+    <string name="sort_star_mediatype">nach Medienart</string>
+    <string name="mediatype_all">Alle</string>
+    <plurals name="mediatype_default">
+        <item quantity="one">Medium</item>
+        <item quantity="other">Medien</item>
+    </plurals>
+    <plurals name="mediatype_BOOK">
+        <item quantity="one">@string/mediatype_book</item>
+        <item quantity="other">Bücher</item>
+    </plurals>
+    <plurals name="mediatype_CD">
+        <item quantity="one">@string/mediatype_cd</item>
+        <item quantity="other">CDs</item>
+    </plurals>
+    <plurals name="mediatype_DVD">
+        <item quantity="one">@string/mediatype_dvd</item>
+        <item quantity="other">DVDs</item>
+    </plurals>
+    <plurals name="mediatype_BLUERAY">
+        <item quantity="one">@string/mediatype_bluray</item>
+        <item quantity="other">Blue-rays</item>
     </plurals>
 </resources>

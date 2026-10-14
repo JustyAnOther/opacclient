@@ -3,21 +3,21 @@
       xmlns:app="http://schemas.android.com/apk/res-auto">
 
     <item
-        android:id="@+id/action_filter"
-        android:icon="@drawable/baseline_filter_list_24"
+        android:id="@+id/action_filter_branch"
+        android:icon="@drawable/ic_filter_marker_white_24dp"
         app:showAsAction="ifRoom"
         android:title="@string/filter_starred">
         <!-- leeres (sub) menu für Branches -->
         <menu>
             <item
-                android:id="@+id/action_filter_all"
+                android:id="@+id/action_filter_branch_all"
                 android:visible="true"
                 android:checkable="false"
                 android:checked="false"
                 android:title="@string/starred_filter_all">
             </item>
             <item
-                android:id="@+id/action_filter_no_branch"
+                android:id="@+id/action_filter_branch_none"
                 android:visible="true"
                 android:checkable="false"
                 android:checked="false"
@@ -34,6 +34,86 @@
             -->
         </menu>
     </item>
+    <item
+        android:id="@+id/action_sort"
+        android:icon="@drawable/ic_sort_white_24dp"
+        app:showAsAction="ifRoom"
+        android:title="@string/sort_history">
+        <menu>
+            <item
+                android:id="@+id/action_sort_star_title"
+                android:visible="true"
+                android:checkable="false"
+                android:checked="false"
+                android:title="@string/sort_star_title">
+            </item>
+            <item
+                android:id="@+id/action_sort_star_author"
+                android:visible="true"
+                android:checkable="false"
+                android:checked="false"
+                android:title="@string/sort_star_author">
+            </item>
+            <item
+                android:id="@+id/action_sort_star_date"
+                android:visible="true"
+                android:checkable="false"
+                android:checked="false"
+                android:title="@string/sort_star_date">
+            </item>
+            <item
+                android:id="@+id/action_sort_star_mediatype"
+                android:visible="true"
+                android:checkable="false"
+                android:checked="false"
+                android:title="@string/sort_star_mediatype">
+            </item>
+        </menu>
+    </item>
+    <item
+        android:id="@+id/action_filter_mediatype"
+        android:icon="@drawable/baseline_filter_list_24"
+        app:showAsAction="ifRoom"
+        android:title="@string/filter_starred">
+        <menu>
+            <item
+                android:id="@+id/action_filter_mediatype_book"
+                android:visible="true"
+                android:checkable="false"
+                android:checked="false"
+                android:title="@string/mediatype_book">
+            </item>
+            <item
+                android:id="@+id/action_filter_mediatype_cd"
+                android:visible="true"
+                android:checkable="false"
+                android:checked="false"
+                android:title="@string/mediatype_cd">
+            </item>
+            <item
+                android:id="@+id/action_filter_mediatype_dvd"
+                android:visible="true"
+                android:checkable="false"
+                android:checked="false"
+                android:title="@string/mediatype_dvd">
+            </item>
+            <item
+                android:id="@+id/action_filter_mediatype_blueray"
+                android:visible="true"
+                android:checkable="false"
+                android:checked="false"
+                android:title="@string/mediatype_bluray">
+            </item>
+            <item
+                android:id="@+id/action_filter_mediatype_all"
+                android:visible="true"
+                android:checkable="false"
+                android:checked="false"
+                android:title="@string/mediatype_all">
+            </item>
+        </menu>
+    </item>
+
     <item
         android:id="@+id/action_export"
         android:icon="@drawable/ic_share_toolbar_24dp"

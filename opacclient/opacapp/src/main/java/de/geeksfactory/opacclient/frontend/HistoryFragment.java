@@ -66,6 +66,7 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import androidx.appcompat.app.AlertDialog;
@@ -89,7 +90,10 @@ import de.geeksfactory.opacclient.storage.HistoryDataSource;
 import de.geeksfactory.opacclient.storage.HistoryDatabase;
 import de.geeksfactory.opacclient.storage.HistoryItem;
 import de.geeksfactory.opacclient.storage.JsonSearchFieldDataSource;
+import de.geeksfactory.opacclient.storage.StarDatabase;
 import de.geeksfactory.opacclient.utils.CompatibilityUtils;
+import de.geeksfactory.opacclient.utils.EnumFilterMediaType;
+import de.geeksfactory.opacclient.utils.EnumSortDirection;
 import de.geeksfactory.opacclient.utils.Utils;
 
 public class HistoryFragment extends Fragment implements
@@ -98,6 +102,7 @@ public class HistoryFragment extends Fragment implements
     private static final String STATE_ACTIVATED_POSITION = "activated_position";
     private static final String STATE_SORT_DIRECTION = "sort_direction";
     private static final String STATE_SORT_OPTION = "sort_option";
+    private static final String STATE_FILTER_MEDIATYPE = "filter_mediatype";
 
     private static final String JSON_LIBRARY_NAME = "library_name";
     private static final String JSON_HISTORY_LIST = "history_list";
@@ -120,28 +125,9 @@ public class HistoryFragment extends Fragment implements
     private boolean showMediatype = true;
     private boolean showCover = true;
 
-    private enum EnumSortDirection {
-
-        DESC("DESC", R.string.sort_direction_desc), ASC("ASC", R.string.sort_direction_asc);
-
-        final String sqlText;
-        final int textId;
-
-        private EnumSortDirection(String sqlText, int textId) {
-            this.sqlText = sqlText;
-            this.textId = textId;
-        }
-
-        public EnumSortDirection swap() {
-            if (this == ASC) {
-                return DESC;
-            } else {
-                return ASC;
-            }
-        }
-    }
-
     EnumSortDirection currentSortDirection = null;
+    private SearchResult.MediaType currentFilterMediaType;
+    private static SearchResult.MediaType FILTER_MEDIATYPE_NONE = null;
 
     private enum EnumSortOption {
 
@@ -333,6 +319,15 @@ public class HistoryFragment extends Fragment implements
             currentSortOption = EnumSortOption.valueOf(savedInstanceState
                     .getString(STATE_SORT_OPTION));
         }
+
+        if (savedInstanceState.containsKey(STATE_FILTER_MEDIATYPE)) {
+            String s = savedInstanceState.getString(STATE_FILTER_MEDIATYPE, null);
+            if (s == null) {
+                currentFilterMediaType = FILTER_MEDIATYPE_NONE;
+            } else {
+                currentFilterMediaType = SearchResult.MediaType.valueOf(s);
+            }
+        }
     }
     private void updateHeader() {
         // getString needs context
@@ -342,12 +337,22 @@ public class HistoryFragment extends Fragment implements
 
         String text = null;
         int countItems = adapter.getCount();
+
+        // item/items bzw. Medium/Medien
+        String mediatypeName = getResources().getQuantityString(R.plurals.mediatype_default, countItems);
+        if (currentFilterMediaType != null) {
+            String key = "mediatype_" + currentFilterMediaType.name();
+            String packageName = getContext().getPackageName();
+            int resId = getResources().getIdentifier(key, "plurals", packageName);
+            mediatypeName = getResources().getQuantityString(resId, countItems);
+        }
+
         if (currentSortOption == null) {
-            text = getString(R.string.history_header, countItems);
+            text = getString(R.string.history_header, countItems, mediatypeName);
         } else {
             String sortColumnText = getString(currentSortOption.textId);
-            String sortDirectionText = getString(currentSortDirection.textId);
-            text = getString(R.string.history_header_sort, countItems,
+            String sortDirectionText = getString(currentSortDirection.getTextId());
+            text = getString(R.string.history_header_sort, countItems, mediatypeName,
                     sortColumnText, sortDirectionText);
         }
         tvHistoryHeader.setText(text);
@@ -386,10 +391,23 @@ public class HistoryFragment extends Fragment implements
         } else if (item.getItemId() == R.id.action_remove_all) {
             removeAll();
             return true;
+        } else if (item.getItemId() == R.id.action_sort) {
+            // Hauptmenüpunkt, do nothing
+            return super.onOptionsItemSelected(item);
+        } else if (item.getItemId() == R.id.action_filter_mediatype) {
+            // Hauptmenüpunkt, do nothing
+            return super.onOptionsItemSelected(item);
         } else {
             EnumSortOption sortOption = EnumSortOption.fromMenuId(item.getItemId());
             if (sortOption != null) {
                 sort(sortOption);
+                return true;
+            }
+
+            EnumFilterMediaType filterOption = EnumFilterMediaType.fromMenuId(item.getItemId());
+            if (filterOption != null) {
+                currentFilterMediaType = filterOption.getMediaType();
+                getActivity().getSupportLoaderManager().restartLoader(LOADER_ID, null, this);
                 return true;
             }
         }
@@ -416,6 +434,7 @@ public class HistoryFragment extends Fragment implements
 
     @Override
     public void accountSelected(Account account) {
+        currentFilterMediaType = FILTER_MEDIATYPE_NONE;
         getActivity().getSupportLoaderManager().restartLoader(LOADER_ID, null, this);
     }
 
@@ -437,6 +456,7 @@ public class HistoryFragment extends Fragment implements
                                 HistoryDataSource data = new HistoryDataSource(getActivity());
                                 String bib = app.getLibrary().getIdent();
                                 data.removeAll(bib);
+                                currentFilterMediaType = FILTER_MEDIATYPE_NONE;
                                 break;
 
                             case DialogInterface.BUTTON_NEGATIVE:
@@ -471,24 +491,33 @@ public class HistoryFragment extends Fragment implements
 
     @Override
     public Loader<Cursor> onCreateLoader(int arg0, Bundle arg1) {
-        if (app.getLibrary() != null) {
-            String sortOrder = null;
-            if (currentSortOption != null) {
-                sortOrder = currentSortOption.column + " " + currentSortDirection.sqlText;
-            }
-
-            HistoryDataSource data = new HistoryDataSource(getActivity());
-            showMediatype = (data.getCountItemsWithMediatype() > 0);
-            showCover = (data.getCountItemsWithCover() > 0);
-            // Hinweis: listitem_history_item ivCover.visibility default ist GONE
-
-            return new CursorLoader(getActivity(),
-                    app.getHistoryProviderHistoryUri(), HistoryDatabase.COLUMNS,
-                    HistoryDatabase.HIST_WHERE_LIB, new String[]{app
-                    .getLibrary().getIdent()}, sortOrder);
-        } else {
+        if (app.getLibrary() == null) {
             return null;
         }
+
+        String sortOrder = null;
+        if (currentSortOption != null) {
+            sortOrder = currentSortOption.column + " " + currentSortDirection.getSqlText();
+        }
+
+        String selection = HistoryDatabase.HIST_WHERE_LIB;
+        final String bib = app.getLibrary().getIdent();
+        String[] selectionArgs = new String[]{bib};
+
+        if (currentFilterMediaType != null) {
+            selection = selection + " and mediatype = ?";
+            selectionArgs = Arrays.copyOf(selectionArgs, selectionArgs.length+1);
+            selectionArgs[selectionArgs.length-1] = currentFilterMediaType.name();
+        }
+
+        HistoryDataSource data = new HistoryDataSource(getActivity());
+        showMediatype = (data.getCountItemsWithMediatype() > 0);
+        showCover = (data.getCountItemsWithCover() > 0);
+        // Hinweis: listitem_history_item ivCover.visibility default ist GONE
+
+        return new CursorLoader(getActivity(),
+                app.getHistoryProviderHistoryUri(), HistoryDatabase.COLUMNS,
+                selection, selectionArgs, sortOrder);
     }
 
     @Override

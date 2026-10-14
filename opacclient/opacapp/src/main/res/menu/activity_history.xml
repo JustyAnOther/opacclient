@@ -35,6 +35,49 @@
         </menu>
     </item>
     <item
+        android:id="@+id/action_filter_mediatype"
+        android:icon="@drawable/baseline_filter_list_24"
+        app:showAsAction="ifRoom"
+        android:title="@string/filter_starred">
+        <menu>
+            <item
+                android:id="@+id/action_filter_mediatype_book"
+                android:visible="true"
+                android:checkable="false"
+                android:checked="false"
+                android:title="@string/mediatype_book">
+            </item>
+            <item
+                android:id="@+id/action_filter_mediatype_cd"
+                android:visible="true"
+                android:checkable="false"
+                android:checked="false"
+                android:title="@string/mediatype_cd">
+            </item>
+            <item
+                android:id="@+id/action_filter_mediatype_dvd"
+                android:visible="true"
+                android:checkable="false"
+                android:checked="false"
+                android:title="@string/mediatype_dvd">
+            </item>
+            <item
+                android:id="@+id/action_filter_mediatype_blueray"
+                android:visible="true"
+                android:checkable="false"
+                android:checked="false"
+                android:title="@string/mediatype_bluray">
+            </item>
+            <item
+                android:id="@+id/action_filter_mediatype_all"
+                android:visible="true"
+                android:checkable="false"
+                android:checked="false"
+                android:title="@string/mediatype_all">
+            </item>
+        </menu>
+    </item>
+    <item
         android:id="@+id/action_export_to_storage"
         app:showAsAction="never"
         android:title="@string/export_history_to_storage">

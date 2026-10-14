@@ -28,6 +28,11 @@ import android.util.Log;
 
 public class StarDatabase extends SQLiteOpenHelper {
 
+    public static final String STAR_COL_TITLE = "title";
+    public static final String STAR_COL_AUTHOR = "author";
+    public static final String STAR_COL_DATE = "star_date";
+    public static final String STAR_COL_MEDIATYPE = "mediatype";
+
     public static final String STAR_TABLE = "starred";
     private static final String STAR_TABLE_CREATE = "create table " + STAR_TABLE
             + " ( id integer primary key autoincrement," + " medianr text,"
